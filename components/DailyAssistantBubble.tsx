@@ -187,7 +187,7 @@ export default function DailyAssistantBubble({
         {!open && totalAlerts > 0 && (
           <div
             onClick={handleToggleOpen}
-            className="mb-2 mr-1 px-3 py-1.5 rounded-2xl bg-[#0f1b2c]/95 border border-cyan-400/40 text-cyan-200 text-xs font-bold shadow-xl shadow-cyan-950/50 backdrop-blur-md cursor-pointer hover:scale-105 transition-all flex items-center gap-1.5 animate-in fade-in slide-in-from-bottom-2"
+            className="mb-2 mr-1 px-3 py-1.5 rounded-2xl bg-[#0f1b2c] border border-cyan-400/40 text-cyan-200 text-xs font-bold shadow-xl shadow-cyan-950/50 cursor-pointer hover:scale-105 transition-transform flex items-center gap-1.5 animate-in fade-in slide-in-from-bottom-2 touch-manipulation transform-gpu"
           >
             <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
             <span>Radar: {totalAlerts} misión{totalAlerts > 1 ? "es" : ""} hoy</span>
@@ -196,15 +196,15 @@ export default function DailyAssistantBubble({
         )}
 
         {/* Botón Orb interactivo */}
-        <div className="relative group">
+        <div className="relative group transform-gpu">
           {/* Ondas radar animadas */}
           <div className="absolute inset-0 rounded-full bg-cyan-500/25 animate-radar-pulse pointer-events-none" />
-          <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-blue-600 via-indigo-500 to-cyan-400 opacity-70 blur-md group-hover:opacity-100 transition duration-300" />
+          <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-blue-600 via-indigo-500 to-cyan-400 opacity-70 blur-md group-hover:opacity-100 transition duration-300 pointer-events-none" />
 
           <button
             type="button"
             onClick={handleToggleOpen}
-            className={`relative w-15 h-15 rounded-full flex items-center justify-center bg-gradient-to-tr from-blue-700 via-indigo-600 to-cyan-500 text-white shadow-2xl shadow-blue-500/50 border-2 border-white/25 cursor-pointer transition-transform duration-300 active:scale-95 ${
+            className={`relative w-15 h-15 rounded-full flex items-center justify-center bg-gradient-to-tr from-blue-700 via-indigo-600 to-cyan-500 text-white shadow-2xl shadow-blue-500/50 border-2 border-white/25 cursor-pointer transition-transform duration-300 active:scale-95 touch-manipulation transform-gpu ${
               wiggling ? "animate-cyber-wiggle" : "animate-cyber-float"
             }`}
             aria-label="Abrir asistente de taller"
@@ -237,9 +237,9 @@ export default function DailyAssistantBubble({
 
       {/* MODAL / HUD HOLOGRÁFICO */}
       {open && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-3 sm:p-4 bg-black/70 animate-in fade-in duration-150">
           <div
-            className="w-full max-w-lg rounded-3xl bg-[#0d1626]/95 border border-cyan-500/30 shadow-2xl shadow-cyan-950/60 backdrop-blur-2xl p-5 sm:p-6 space-y-4 max-h-[88vh] overflow-y-auto animate-in zoom-in-95 duration-200"
+            className="w-full max-w-lg rounded-3xl bg-[#0d1626]/98 border border-cyan-500/30 shadow-2xl shadow-cyan-950/60 p-5 sm:p-6 space-y-4 max-h-[88vh] overflow-y-auto animate-in zoom-in-95 duration-150 transform-gpu"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header del Asistente */}

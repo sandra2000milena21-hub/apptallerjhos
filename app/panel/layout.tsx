@@ -28,7 +28,7 @@ export default async function PanelLayout({ children }: { children: React.ReactN
 
   return (
     <div className="min-h-dvh flex flex-col">
-      <header className="no-print sticky top-0 z-30 bg-[#0b1320]/85 backdrop-blur-xl border-b border-white/[0.08]">
+      <header className="no-print sticky top-0 z-30 bg-[#0b1320]/95 backdrop-blur-md border-b border-white/[0.08] transform-gpu">
         <div className="mx-auto max-w-7xl px-4 h-16 flex items-center gap-3">
           <Link href="/panel" className="flex items-center gap-2.5 mr-2 group shrink-0">
             <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center font-black text-white text-sm shadow-md shadow-blue-500/20 group-hover:scale-105 transition">

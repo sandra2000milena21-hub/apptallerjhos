@@ -74,7 +74,7 @@ export default function Board({ cards }: { cards: BoardCard[] }) {
   }
 
   return (
-    <div className="flex gap-3.5 overflow-x-auto pb-4 -mx-4 px-4 snap-x">
+    <div className="flex gap-3.5 overflow-x-auto pb-4 -mx-4 px-4 snap-x overscroll-x-contain touch-pan-x transform-gpu">
       {STATUSES.map((s) => {
         const col = local.filter((o) => o.status === s.key);
         return (
@@ -132,7 +132,7 @@ export default function Board({ cards }: { cards: BoardCard[] }) {
                       setDragging(null);
                       setOver(null);
                     }}
-                    className={`card p-3.5 bg-[#142136] hover:bg-[#182842] border transition rounded-2xl select-none ${
+                    className={`card p-3.5 bg-[#142136] hover:bg-[#182842] border transition rounded-2xl select-none touch-manipulation ${
                       isExpanded
                         ? "border-blue-500/60 ring-2 ring-blue-500/30 shadow-xl shadow-blue-950/40"
                         : "border-white/[0.08] hover:border-blue-500/35"
