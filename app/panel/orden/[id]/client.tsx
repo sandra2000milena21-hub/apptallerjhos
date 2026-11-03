@@ -6,8 +6,9 @@ import MediaUploader from "@/components/MediaUploader";
 import Checklist from "@/components/Checklist";
 import SignaturePad from "@/components/SignaturePad";
 import { MEDIA_CATEGORIES, type CheckValue } from "@/lib/constants";
-import { addProductItem, createWompiLink, deliver, saveChecklistOut } from "./actions";
+import { addProductItem, createWompiLink, deliver, saveChecklistOut, processDeliveryAction } from "./actions";
 import { searchProductsAction } from "@/app/panel/inventario/actions";
+import { PAYMENT_METHODS } from "@/lib/constants";
 
 export function OrderUploader({ orderId, defaultCategory }: { orderId: number; defaultCategory: string }) {
   const [category, setCategory] = useState(defaultCategory);
@@ -58,40 +59,219 @@ export function ChecklistOutForm({ orderId, initial, items }: { orderId: number;
 export function DeliverForm({ orderId, customerName, balance }: { orderId: number; customerName: string; balance: number }) {
   const router = useRouter();
   const [signature, setSignature] = useState<string | null>(null);
+  const [showSignature, setShowSignature] = useState(false);
   const [to, setTo] = useState(customerName);
+  const [payRemaining, setPayRemaining] = useState(balance > 0);
+  const [paymentMethod, setPaymentMethod] = useState("Efectivo");
+  const [customAmount, setCustomAmount] = useState(balance > 0 ? String(balance) : "0");
+  const [finalNote, setFinalNote] = useState("");
+  const [noteIsPublic, setNoteIsPublic] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<{ saleId?: number } | null>(null);
   const [pending, start] = useTransition();
-  return (
-    <div className="space-y-3">
-      {balance > 0 && (
-        <p className="rounded-xl bg-warn-soft text-warn font-semibold px-3 py-2 text-sm">
-          Hay un saldo pendiente de ${balance.toLocaleString("es-CO")}. Regístralo en Pagos antes de entregar.
-        </p>
-      )}
-      <div>
-        <label className="label">Recibe</label>
-        <input className="input" value={to} onChange={(e) => setTo(e.target.value)} />
+
+  const num = (v: string) => parseInt(v.replace(/\D/g, "") || "0", 10);
+  const payAmount = payRemaining ? (customAmount ? num(customAmount) : balance) : 0;
+  const pointsToEarn = Math.floor(payAmount / 1000);
+
+  if (success) {
+    return (
+      <div className="rounded-2xl p-4 bg-emerald-500/10 border border-emerald-500/30 text-center space-y-3 animate-in zoom-in-95 duration-150">
+        <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400 flex items-center justify-center text-2xl mx-auto">
+          ✓
+        </div>
+        <div>
+          <p className="font-extrabold text-white text-base">¡Equipo Entregado con Éxito!</p>
+          <p className="text-xs text-slate-300 mt-0.5">
+            Entregado a <b className="text-white">{to}</b>
+            {payAmount > 0 ? ` · Pago de $${payAmount.toLocaleString("es-CO")} en ${paymentMethod}` : ""}.
+          </p>
+          {pointsToEarn > 0 && (
+            <p className="text-xs text-amber-300 font-bold mt-1">
+              ⭐ Se acreditaron +{pointsToEarn} puntos al cliente
+            </p>
+          )}
+        </div>
+        <div className="flex flex-col gap-2 pt-1">
+          {success.saleId && (
+            <a
+              href={`/panel/ventas/${success.saleId}`}
+              target="_blank"
+              rel="noreferrer"
+              className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs shadow-md transition flex items-center justify-center gap-1.5"
+            >
+              <span>🖨️</span>
+              <span>Imprimir Ticket Térmico (80 mm)</span>
+            </a>
+          )}
+          <button
+            type="button"
+            onClick={() => router.refresh()}
+            className="w-full py-2 px-3 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-slate-200 font-semibold text-xs transition"
+          >
+            Actualizar pantalla
+          </button>
+        </div>
       </div>
-      <p className="text-sm text-muted">El cliente probó el equipo y lo recibe a satisfacción. Se le explicó la garantía.</p>
-      <SignaturePad onChange={setSignature} height={150} />
-      {error && <p className="text-bad font-medium text-sm">{error}</p>}
+    );
+  }
+
+  return (
+    <div className="space-y-3.5">
+      {/* Saldo y cobro */}
+      {balance > 0 ? (
+        <div className="rounded-2xl p-3 bg-[#0a121e] border border-white/[0.08] space-y-2.5">
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider block">Saldo Pendiente</span>
+              <span className="text-xl font-black text-amber-400 tabular-nums">${balance.toLocaleString("es-CO")}</span>
+            </div>
+            <label className="flex items-center gap-2 text-xs font-semibold text-slate-200 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={payRemaining}
+                onChange={(e) => setPayRemaining(e.target.checked)}
+                className="size-4 rounded accent-emerald-500"
+              />
+              <span>Cobrar ahora</span>
+            </label>
+          </div>
+
+          {payRemaining && (
+            <div className="space-y-2 pt-1.5 border-t border-white/[0.06] animate-in fade-in duration-150">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                Método de Pago:
+              </label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {["Efectivo", "Transferencia", "Tarjeta"].map((m) => {
+                  const isSel = paymentMethod === m;
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setPaymentMethod(m)}
+                      className={`py-1.5 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        isSel
+                          ? "bg-gradient-to-r from-emerald-600 to-teal-500 text-white shadow-md shadow-emerald-900/40 border border-emerald-400/50"
+                          : "bg-white/[0.05] hover:bg-white/[0.10] text-slate-300 border border-white/[0.06]"
+                      }`}
+                    >
+                      {m === "Efectivo" ? "💵 Efectivo" : m === "Transferencia" ? "📲 Transf." : "💳 Tarjeta"}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-center justify-between gap-2 pt-1">
+                <span className="text-xs text-slate-300">Monto:</span>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    className="input !min-h-8 !w-28 text-right font-bold text-emerald-400 text-xs"
+                    inputMode="numeric"
+                    value={customAmount ? Number(customAmount).toLocaleString("es-CO") : ""}
+                    onChange={(e) => setCustomAmount(String(num(e.target.value)))}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setCustomAmount(String(balance))}
+                    className="btn-ghost !min-h-8 !px-2 text-[11px]"
+                  >
+                    Exacto
+                  </button>
+                </div>
+              </div>
+
+              {pointsToEarn > 0 && (
+                <p className="text-[10px] text-amber-300/90 font-medium">
+                  ⭐ Acumulará <b>+{pointsToEarn} pts</b> de fidelización con este pago.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-xs font-bold">
+          <span>✓</span>
+          <span>Orden totalmente saldada ($0 pendiente).</span>
+        </div>
+      )}
+
+      {/* Nota final de reparación */}
+      <div className="space-y-1">
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-bold text-slate-300">Nota final de reparación (opcional)</label>
+          <label className="flex items-center gap-1 text-[10px] text-slate-400 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={noteIsPublic}
+              onChange={(e) => setNoteIsPublic(e.target.checked)}
+              className="size-3 rounded accent-blue-500"
+            />
+            <span>Visible al cliente</span>
+          </label>
+        </div>
+        <textarea
+          rows={2}
+          value={finalNote}
+          onChange={(e) => setFinalNote(e.target.value)}
+          placeholder="Ej. Se probó táctil y audio con el cliente. Garantía de 3 meses."
+          className="input !text-xs !min-h-14 resize-none"
+        />
+      </div>
+
+      {/* Nombre de quien recibe */}
+      <div>
+        <label className="text-xs font-bold text-slate-300 block mb-1">Nombre de quien retira</label>
+        <input className="input !min-h-9 text-xs" value={to} onChange={(e) => setTo(e.target.value)} />
+      </div>
+
+      {/* Firma opcional */}
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold text-slate-300">Firma de recibido</span>
+          <button
+            type="button"
+            onClick={() => setShowSignature((v) => !v)}
+            className="text-xs text-blue-400 hover:text-blue-300 font-semibold cursor-pointer"
+          >
+            {showSignature ? "Ocultar firma" : "✍️ Agregar firma"}
+          </button>
+        </div>
+        {showSignature && (
+          <div className="rounded-2xl border border-white/[0.12] bg-white p-1 overflow-hidden animate-in fade-in duration-150">
+            <SignaturePad onChange={setSignature} height={110} />
+          </div>
+        )}
+      </div>
+
+      {error && <p className="text-rose-400 font-bold text-xs bg-rose-500/10 p-2 rounded-xl border border-rose-500/25">{error}</p>}
+
       <button
         type="button"
-        className="btn-good w-full"
+        className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black text-xs shadow-lg shadow-emerald-950/60 border border-emerald-400/50 transition active:scale-95 cursor-pointer disabled:opacity-50"
         disabled={pending}
         onClick={() =>
           start(async () => {
-            const fd = new FormData();
-            fd.set("orderId", String(orderId));
-            fd.set("signature", signature ?? "");
-            fd.set("delivered_to", to);
-            const res = await deliver(fd);
-            if (!res.ok) setError(res.error ?? "Error");
-            else router.refresh();
+            setError(null);
+            const res = await processDeliveryAction({
+              orderId,
+              deliveredTo: to.trim() || customerName,
+              payRemaining: payRemaining && balance > 0,
+              paymentMethod,
+              paymentAmount: payAmount,
+              finalNote: finalNote.trim() || undefined,
+              noteIsPublic,
+              signature: showSignature ? signature : null,
+            });
+            if (!res.ok) {
+              setError(res.error ?? "Ocurrió un error al entregar.");
+            } else {
+              setSuccess({ saleId: res.saleId });
+            }
           })
         }
       >
-        {pending ? "Guardando…" : "Confirmar entrega"}
+        {pending ? "Procesando entrega y cobro…" : `✅ Confirmar Entrega ${payRemaining && payAmount > 0 ? `y Cobro ($${payAmount.toLocaleString("es-CO")})` : ""}`}
       </button>
     </div>
   );

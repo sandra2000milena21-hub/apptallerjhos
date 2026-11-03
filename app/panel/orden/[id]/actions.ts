@@ -2,8 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
-import { dbx } from "@/lib/db";
-import { addEvent, getOrder, totals } from "@/lib/orders";
+import { dbx, tx } from "@/lib/db";
+import { addEvent, getOrder, nextNumber, totals } from "@/lib/orders";
 import { STATUS_KEYS, statusInfo, deviceType, PRIORITIES } from "@/lib/constants";
 import { getProduct, moveStock } from "@/lib/inventory";
 import { notifyOrderStatus } from "@/lib/notify";
@@ -285,4 +285,170 @@ export async function updateDueDate(fd: FormData) {
   (await dbx.run("UPDATE orders SET due_date = ? WHERE id = ?", due, id));
   await addEvent({ orderId: id, type: "system", body: due ? `Nueva fecha estimada de entrega: ${due}` : "Fecha de entrega sin definir", isPublic: true, userId: user.id });
   refresh(id);
+}
+
+export type OrderDeliveryInfo = {
+  orderId: number;
+  number: string;
+  model: string;
+  brand: string | null;
+  customerName: string;
+  customerPhone: string;
+  total: number;
+  paid: number;
+  balance: number;
+};
+
+export async function getOrderDeliveryInfo(orderId: number): Promise<OrderDeliveryInfo | null> {
+  await requireUser();
+  const o = await getOrder(orderId);
+  if (!o) return null;
+  const t = await totals(orderId, o);
+  return {
+    orderId: o.id,
+    number: o.number,
+    model: o.model,
+    brand: o.brand,
+    customerName: o.customer_name,
+    customerPhone: o.customer_phone,
+    total: t.total,
+    paid: t.paid,
+    balance: t.balance,
+  };
+}
+
+export type DeliveryProcessInput = {
+  orderId: number;
+  deliveredTo: string;
+  payRemaining: boolean;
+  paymentMethod: string;
+  paymentAmount: number;
+  finalNote?: string;
+  noteIsPublic?: boolean;
+  signature?: string | null;
+};
+
+export async function processDeliveryAction(input: DeliveryProcessInput): Promise<{ ok: boolean; error?: string; saleId?: number }> {
+  const user = await requireUser();
+  const id = input.orderId;
+  const o = await getOrder(id);
+  if (!o) return { ok: false, error: "Orden no encontrada." };
+
+  const receivedBy = (input.deliveredTo || o.customer_name).trim();
+  if (!receivedBy) return { ok: false, error: "Indica quién recibe el equipo." };
+
+  const t = await totals(id, o);
+  let saleId: number | undefined = undefined;
+
+  try {
+    await tx(async (db) => {
+      // 1. Si hay saldo restante y se marcó para cobrar:
+      if (input.payRemaining && t.balance > 0) {
+        const amount = Math.min(Math.max(0, input.paymentAmount || t.balance), t.balance);
+        if (amount > 0) {
+          const method = input.paymentMethod || "Efectivo";
+          const saleNumber = await nextNumber("sale_prefix", "next_sale", "V-", db);
+          const pointsEarned = o.customer_id && amount > 0 ? Math.floor(amount / 1000) : 0;
+
+          const sId = Number(
+            (await db.run(
+              "INSERT INTO sales (number, customer_id, subtotal, discount, total, points_earned, points_redeemed, note, user_id) VALUES (?, ?, ?, 0, ?, ?, 0, ?, ?)",
+              saleNumber,
+              o.customer_id,
+              amount,
+              amount,
+              pointsEarned,
+              `Entrega orden ${o.number} (${o.model})`,
+              user.id,
+            )).lastInsertRowid,
+          );
+          saleId = sId;
+
+          await db.run("INSERT INTO sale_payments (sale_id, method, amount) VALUES (?, ?, ?)", sId, method, amount);
+          await db.run(
+            "INSERT INTO sale_items (sale_id, order_id, description, qty, unit_price, unit_cost) VALUES (?, ?, ?, 1, ?, 0)",
+            sId,
+            o.id,
+            `Saldo orden ${o.number} · ${o.model}`,
+            amount,
+          );
+          await db.run(
+            "INSERT INTO payments (order_id, amount, method, note, sale_id, user_id) VALUES (?, ?, ?, ?, ?, ?)",
+            o.id,
+            amount,
+            method,
+            `Cobrado en entrega (${saleNumber})`,
+            sId,
+            user.id,
+          );
+
+          if (pointsEarned > 0 && o.customer_id) {
+            await db.run("UPDATE customers SET points = points + ? WHERE id = ?", pointsEarned, o.customer_id);
+          }
+
+          await addEvent(
+            {
+              orderId: o.id,
+              type: "payment",
+              body: `Pago de $${amount.toLocaleString("es-CO")} en entrega (${method}). Recibo ${saleNumber}.`,
+              userId: user.id,
+            },
+            db,
+          );
+        }
+      }
+
+      // 2. Nota final de reparación
+      if (input.finalNote && input.finalNote.trim()) {
+        await addEvent(
+          {
+            orderId: o.id,
+            type: "note",
+            body: `Nota final de entrega: ${input.finalNote.trim()}`,
+            isPublic: input.noteIsPublic ?? true,
+            userId: user.id,
+          },
+          db,
+        );
+      }
+
+      // 3. Firma digital
+      let sigId: string | null = null;
+      if (input.signature && input.signature.startsWith("data:image")) {
+        sigId = await saveSignature(input.signature, o.id, user.id);
+      }
+
+      // 4. Actualizar orden a "entregado"
+      const sets = [
+        "status = 'entregado'",
+        "delivered_at = datetime('now')",
+        "delivered_to = ?",
+      ];
+      const params: unknown[] = [receivedBy];
+      if (sigId) {
+        sets.push("delivery_signature = ?");
+        params.push(sigId);
+      }
+      params.push(o.id);
+      await db.run(`UPDATE orders SET ${sets.join(", ")} WHERE id = ?`, ...params);
+
+      await addEvent(
+        {
+          orderId: o.id,
+          type: "status",
+          status: "entregado",
+          body: `Equipo entregado a ${receivedBy}, recibido a satisfacción.`,
+          isPublic: true,
+          userId: user.id,
+        },
+        db,
+      );
+    });
+
+    await notifyOrderStatus(o.id, "entregado");
+    refresh(o.id);
+    return { ok: true, saleId };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
 }

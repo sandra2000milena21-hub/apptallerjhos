@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { STATUSES, statusInfo } from "@/lib/constants";
 import { changeStatus } from "./orden/[id]/actions";
+import DeliveryModal from "@/components/DeliveryModal";
 
 export type BoardCard = {
   id: number;
@@ -42,6 +43,7 @@ export default function Board({ cards }: { cards: BoardCard[] }) {
   const [local, setLocal] = useState(cards);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
+  const [deliveryOrder, setDeliveryOrder] = useState<BoardCard | null>(null);
   const [, start] = useTransition();
 
   // Sincroniza cuando el servidor manda datos nuevos.
@@ -74,7 +76,8 @@ export default function Board({ cards }: { cards: BoardCard[] }) {
   }
 
   return (
-    <div className="flex gap-3.5 overflow-x-auto pb-4 -mx-4 px-4 snap-x overscroll-x-contain touch-pan-x transform-gpu">
+    <>
+      <div className="flex gap-3.5 overflow-x-auto pb-4 -mx-4 px-4 snap-x overscroll-x-contain touch-pan-x transform-gpu">
       {STATUSES.map((s) => {
         const col = local.filter((o) => o.status === s.key);
         return (
@@ -91,7 +94,18 @@ export default function Board({ cards }: { cards: BoardCard[] }) {
               e.preventDefault();
               setOver(null);
               const id = dragging ?? parseInt(e.dataTransfer.getData("text/plain"), 10);
-              if (id) move(id, s.key);
+              if (id) {
+                if (s.key === "entregado") {
+                  const card = local.find((c) => c.id === id);
+                  if (card) {
+                    setDeliveryOrder(card);
+                  } else {
+                    move(id, "entregado");
+                  }
+                } else {
+                  move(id, s.key);
+                }
+              }
               setDragging(null);
             }}
           >
@@ -153,6 +167,20 @@ export default function Board({ cards }: { cards: BoardCard[] }) {
                           {o.number}
                         </span>
                         <div className="flex items-center gap-1.5">
+                          {o.status !== "entregado" && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeliveryOrder(o);
+                              }}
+                              className="px-2 py-0.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold shadow-sm shadow-emerald-950/40 flex items-center gap-1 transition active:scale-95 cursor-pointer"
+                              title="Entregar equipo al cliente (cobro y nota)"
+                            >
+                              <span>✅</span>
+                              <span>Entregar</span>
+                            </button>
+                          )}
                           <span className="text-xs text-slate-400 font-medium">{o.days} d</span>
                           {/* Flecha de expansión */}
                           <span
@@ -265,11 +293,30 @@ export default function Board({ cards }: { cards: BoardCard[] }) {
                         </div>
 
                         {/* CAMBIAR ESTADO RÁPIDO CON 1 TOQUE (IDÉNTICO A LA PANTALLA DE ORDEN) */}
-                        <div className="space-y-1.5 pt-1">
+                        <div className="space-y-2 pt-1">
                           <div className="flex items-center justify-between text-[11px] px-1 text-slate-400 font-semibold uppercase tracking-wider">
                             <span>Mover estado:</span>
                             <span className="text-blue-400 font-bold">{statusInfo(o.status).short}</span>
                           </div>
+
+                          {/* BOTÓN ULTRA LLAMATIVO: ENTREGADO (ABRE PROCESO DE PAGO Y NOTA) */}
+                          <button
+                            type="button"
+                            onClick={() => setDeliveryOrder(o)}
+                            disabled={o.status === "entregado"}
+                            className={`w-full py-2.5 px-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                              o.status === "entregado"
+                                ? "bg-emerald-950/40 text-emerald-400/60 border border-emerald-500/20"
+                                : "bg-gradient-to-r from-emerald-600 via-teal-500 to-emerald-500 hover:from-emerald-500 hover:to-teal-400 text-white shadow-xl shadow-emerald-950/70 border border-emerald-400/60 ring-2 ring-emerald-400/30 hover:scale-[1.01] active:scale-95"
+                            }`}
+                          >
+                            <span className="text-base animate-pulse">🎁</span>
+                            <span>{o.status === "entregado" ? "Equipo ya entregado" : "Entregar Equipo (Cobro y Nota)"}</span>
+                            <span className="text-emerald-100 text-[10px] font-bold bg-black/30 px-2 py-0.5 rounded-md">
+                              PROCESO →
+                            </span>
+                          </button>
+
                           <div className="grid grid-cols-2 gap-1.5">
                             {STATUSES.map((st) => {
                               const isCurrent = o.status === st.key;
@@ -281,9 +328,7 @@ export default function Board({ cards }: { cards: BoardCard[] }) {
                                   disabled={isCurrent}
                                   onClick={() => {
                                     if (isDeliver) {
-                                      if (confirm(`¿Marcar la orden ${o.number} (${o.model}) como ENTREGADA al cliente?`)) {
-                                        move(o.id, "entregado");
-                                      }
+                                      setDeliveryOrder(o);
                                     } else {
                                       move(o.id, st.key);
                                     }
@@ -294,7 +339,7 @@ export default function Board({ cards }: { cards: BoardCard[] }) {
                                         ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black ring-2 ring-emerald-400 shadow-md shadow-emerald-500/30"
                                         : "bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold ring-2 ring-blue-400 shadow-md shadow-blue-500/30"
                                       : isDeliver
-                                      ? "bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black shadow-lg shadow-emerald-950/60 border border-emerald-400/50 ring-1 ring-emerald-400/30 active:scale-95"
+                                      ? "bg-emerald-600 hover:bg-emerald-500 text-white font-bold border border-emerald-400/40"
                                       : "bg-white/[0.05] hover:bg-white/[0.12] text-slate-300 hover:text-white border border-white/[0.06] active:scale-95"
                                   }`}
                                 >
@@ -374,5 +419,20 @@ export default function Board({ cards }: { cards: BoardCard[] }) {
         );
       })}
     </div>
+
+    {deliveryOrder && (
+      <DeliveryModal
+        orderId={deliveryOrder.id}
+        orderNumber={deliveryOrder.number}
+        model={deliveryOrder.model}
+        customerName={deliveryOrder.customer}
+        onClose={() => setDeliveryOrder(null)}
+        onDelivered={() => {
+          setDeliveryOrder(null);
+          router.refresh();
+        }}
+      />
+    )}
+  </>
   );
 }
