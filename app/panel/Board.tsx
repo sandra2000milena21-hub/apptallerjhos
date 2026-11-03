@@ -212,26 +212,6 @@ export default function Board({ cards }: { cards: BoardCard[] }) {
                       </div>
                     </div>
 
-                    {/* BOTÓN LLAMATIVO "ENTREGADO" EN LA LÁMINA */}
-                    {o.status !== "entregado" && (
-                      <div className="mt-3 pt-2.5 border-t border-white/[0.08]">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (confirm(`¿Marcar la orden ${o.number} (${o.model}) como ENTREGADA al cliente?`)) {
-                              move(o.id, "entregado");
-                            }
-                          }}
-                          className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 hover:from-emerald-500 hover:to-teal-400 active:scale-95 text-white text-[13px] font-black tracking-wide flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-950/60 border border-emerald-400/40 transition-all touch-manipulation cursor-pointer"
-                          title="Marcar equipo como entregado al cliente"
-                        >
-                          <span className="text-sm">✅</span>
-                          <span>Entregado</span>
-                        </button>
-                      </div>
-                    )}
-
                     {/* MÓDULO INTERACTIVO EXPANDIBLE HACIA ABAJO (EN ESE MISMO BLOQUE) */}
                     {isExpanded && (
                       <div
@@ -299,12 +279,22 @@ export default function Board({ cards }: { cards: BoardCard[] }) {
                                   key={st.key}
                                   type="button"
                                   disabled={isCurrent}
-                                  onClick={() => move(o.id, st.key)}
-                                  className={`px-2 py-1.5 rounded-xl text-xs font-semibold text-center transition-all cursor-pointer ${
+                                  onClick={() => {
+                                    if (isDeliver) {
+                                      if (confirm(`¿Marcar la orden ${o.number} (${o.model}) como ENTREGADA al cliente?`)) {
+                                        move(o.id, "entregado");
+                                      }
+                                    } else {
+                                      move(o.id, st.key);
+                                    }
+                                  }}
+                                  className={`px-2 py-2 rounded-xl text-xs font-semibold text-center transition-all cursor-pointer ${
                                     isCurrent
-                                      ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold ring-2 ring-blue-400 shadow-md shadow-blue-500/30"
+                                      ? isDeliver
+                                        ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black ring-2 ring-emerald-400 shadow-md shadow-emerald-500/30"
+                                        : "bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold ring-2 ring-blue-400 shadow-md shadow-blue-500/30"
                                       : isDeliver
-                                      ? "col-span-2 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-extrabold border border-emerald-400/40 shadow-md shadow-emerald-900/40 active:scale-95 py-2 text-[13px]"
+                                      ? "bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black shadow-lg shadow-emerald-950/60 border border-emerald-400/50 ring-1 ring-emerald-400/30 active:scale-95"
                                       : "bg-white/[0.05] hover:bg-white/[0.12] text-slate-300 hover:text-white border border-white/[0.06] active:scale-95"
                                   }`}
                                 >
