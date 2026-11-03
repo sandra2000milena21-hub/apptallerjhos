@@ -23,9 +23,9 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   if (storageMode() === "blob") return NextResponse.json({ error: "Usa la subida directa a Vercel Blob" }, { status: 400 });
 
-  const mime = (req.headers.get("content-type") || "application/octet-stream").split(";")[0].trim();
-  if (!mime.startsWith("image/") && !mime.startsWith("video/")) {
-    return NextResponse.json({ error: "Solo se aceptan fotos y videos" }, { status: 400 });
+  const mime = (req.headers.get("content-type") || "application/octet-stream").split(";")[0].trim().toLowerCase();
+  if (mime === "image/svg+xml" || (!mime.startsWith("image/") && !mime.startsWith("video/"))) {
+    return NextResponse.json({ error: "Solo se aceptan fotos y videos (no se permiten archivos SVG por seguridad)" }, { status: 400 });
   }
   const declared = parseInt(req.headers.get("content-length") || "0", 10);
   if (declared > MAX_BYTES) return NextResponse.json({ error: "Archivo demasiado grande" }, { status: 413 });

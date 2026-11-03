@@ -90,9 +90,22 @@ export async function createOrder(input: NewOrderInput): Promise<{ ok: true; id:
     if (customerId) {
       (await t.run("UPDATE customers SET name = ?, doc_id = ?, phone = ?, email = ? WHERE id = ?", c.name.trim(), c.doc_id.trim() || null, c.phone.trim(), c.email.trim() || null, customerId));
     } else {
-      customerId = Number(
-        (await t.run("INSERT INTO customers (name, doc_id, phone, email) VALUES (?, ?, ?, ?)", c.name.trim(), c.doc_id.trim() || null, c.phone.trim(), c.email.trim() || null)).lastInsertRowid,
-      );
+      const numDigits = c.phone.replace(/\D/g, "");
+      if (numDigits.length >= 7) {
+        const existing = (await t.get(
+          "SELECT id FROM customers WHERE replace(replace(phone,' ',''),'-','') LIKE ? LIMIT 1",
+          `%${numDigits.slice(-10)}`,
+        )) as { id: number } | undefined;
+        if (existing) {
+          customerId = existing.id;
+          (await t.run("UPDATE customers SET name = ?, doc_id = COALESCE(?, doc_id), email = COALESCE(?, email) WHERE id = ?", c.name.trim(), c.doc_id.trim() || null, c.email.trim() || null, customerId));
+        }
+      }
+      if (!customerId) {
+        customerId = Number(
+          (await t.run("INSERT INTO customers (name, doc_id, phone, email) VALUES (?, ?, ?, ?)", c.name.trim(), c.doc_id.trim() || null, c.phone.trim(), c.email.trim() || null)).lastInsertRowid,
+        );
+      }
     }
 
     const deviceId = await upsertDevice({

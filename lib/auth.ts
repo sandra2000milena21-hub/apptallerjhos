@@ -9,6 +9,9 @@ const MAX_AGE = 60 * 60 * 24 * 14; // 14 días
 
 function secret() {
   const s = process.env.SESSION_SECRET || "solo-para-desarrollo-cambia-SESSION_SECRET-en-produccion";
+  if (process.env.NODE_ENV === "production" && (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 16)) {
+    console.warn("⚠️ ALERTA DE SEGURIDAD: SESSION_SECRET no está configurada o es muy corta. Configúrala en variables de entorno.");
+  }
   return new TextEncoder().encode(s);
 }
 
@@ -22,10 +25,11 @@ export async function login(email: string, password: string): Promise<boolean> {
     .setIssuedAt()
     .setExpirationTime(`${MAX_AGE}s`)
     .sign(secret());
+  const isHttps = (process.env.PUBLIC_URL || "").startsWith("https") || process.env.VERCEL === "1";
   (await cookies()).set(COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production" && (process.env.PUBLIC_URL || "").startsWith("https"),
+    secure: process.env.NODE_ENV === "production" ? isHttps : false,
     path: "/",
     maxAge: MAX_AGE,
   });

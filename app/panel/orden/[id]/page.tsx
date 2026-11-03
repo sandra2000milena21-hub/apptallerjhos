@@ -454,7 +454,7 @@ function addMonths(utc: string, months: number): string {
 function MediaTile({ m, orderId }: { m: Media; orderId: number }) {
   const src = `/api/media/${m.id}`;
   return (
-    <div className="rounded-xl overflow-hidden border border-line bg-white">
+    <div className="rounded-2xl overflow-hidden border border-white/[0.08] bg-[#142136]">
       <a href={src} target="_blank" className="block aspect-square bg-black/5">
         {m.kind === "video" ? (
           <video src={src} className="w-full h-full object-cover" preload="metadata" muted playsInline controls />

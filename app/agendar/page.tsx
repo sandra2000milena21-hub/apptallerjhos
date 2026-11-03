@@ -13,6 +13,13 @@ async function book(fd: FormData) {
   "use server";
   const ip = (await headers()).get("x-forwarded-for")?.split(",")[0].trim() || "local";
   const now = Date.now();
+  if (hits.size > 500) {
+    for (const [k, v] of hits) {
+      const active = v.filter((t) => now - t < 3600_000);
+      if (!active.length) hits.delete(k);
+      else hits.set(k, active);
+    }
+  }
   const recent = (hits.get(ip) ?? []).filter((t) => now - t < 3600_000);
   if (recent.length >= 5) redirect("/agendar?error=limite");
   hits.set(ip, [...recent, now]);

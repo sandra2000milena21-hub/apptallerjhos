@@ -14,6 +14,7 @@ const L = (col: string) => `date(${col}, '-5 hours')`;
 async function addExpense(fd: FormData) {
   "use server";
   const user = await requireUser();
+  if (user.role === "tecnico") return;
   const amount = parseMoney(fd.get("amount"));
   const description = String(fd.get("description") || "").trim();
   if (!amount || !description) return;

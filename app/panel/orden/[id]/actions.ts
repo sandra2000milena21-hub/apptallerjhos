@@ -187,10 +187,18 @@ export async function decideQuote(fd: FormData) {
   const id = idOf(fd);
   const decision = fd.get("decision") === "aprobada" ? "aprobada" : "rechazada";
   (await dbx.run("UPDATE orders SET quote_status = ?, quote_decided_at = datetime('now'), quote_decided_by = ? WHERE id = ?", decision, `${user.name} (registrado en el local)`, id));
+  if (decision === "rechazada") {
+    const items = (await dbx.all("SELECT * FROM quote_items WHERE order_id = ? AND product_id IS NOT NULL", id)) as { id: number; product_id: number; qty: number }[];
+    const order = await getOrder(id);
+    for (const it of items) {
+      await moveStock({ productId: it.product_id, qty: it.qty, reason: "devolucion", ref: `${order?.number} (rechazada)`, userId: user.id });
+      await dbx.run("UPDATE quote_items SET product_id = NULL WHERE id = ?", it.id);
+    }
+  }
   await addEvent({
     orderId: id,
     type: "quote",
-    body: decision === "aprobada" ? "Cotización aprobada por el cliente (WhatsApp/teléfono)." : "Cotización rechazada por el cliente.",
+    body: decision === "aprobada" ? "Cotización aprobada por el cliente (WhatsApp/teléfono)." : "Cotización rechazada por el cliente. Los repuestos reservados volvieron al inventario.",
     isPublic: true,
     userId: user.id,
   });

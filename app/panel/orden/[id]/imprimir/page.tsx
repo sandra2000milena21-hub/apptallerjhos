@@ -23,9 +23,9 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
   const services = parseJSON<string[]>(o.services, []).map((k) => serviceLabel(o.device_type, k));
 
   return (
-    <div className="mx-auto max-w-[800px] bg-white p-8 text-[13px] leading-snug print:p-0 print:max-w-none">
+    <div className="mx-auto max-w-[800px] bg-white text-slate-900 p-8 text-[13px] leading-snug print:p-0 print:max-w-none rounded-3xl shadow-2xl print:shadow-none print:rounded-none">
       <div className="no-print mb-4 flex justify-end"><PrintButton /></div>
-      <header className="flex justify-between gap-6 border-b-2 border-ink pb-3">
+      <header className="flex justify-between gap-6 border-b-2 border-slate-900 pb-3">
         <div>
           <h1 className="text-xl font-bold">{s.shop_name}</h1>
           <p>{s.shop_address}</p>
@@ -33,7 +33,7 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
           <p>{s.shop_hours}</p>
         </div>
         <div className="text-right">
-          <p className="text-xs uppercase tracking-wide text-muted">Orden de servicio</p>
+          <p className="text-xs uppercase tracking-wide text-slate-500">Orden de servicio</p>
           <p className="text-2xl font-bold font-mono">{o.number}</p>
           <p>Recibido: {dateTime(o.created_at)}</p>
           <p>Recibió: {o.received_by_name ?? "—"}</p>
@@ -74,7 +74,7 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
       <Block title="Pruebas de ingreso" className="mt-4">
         <div className="grid grid-cols-2 gap-x-6">
           {deviceType(o.device_type).checklist.map((i) => (
-            <div key={i.key} className="flex justify-between border-b border-line py-0.5">
+            <div key={i.key} className="flex justify-between border-b border-slate-200 py-0.5">
               <span>{i.label}</span>
               <span className="font-semibold">{CHECK_LABELS[checkIn[i.key] ?? "np"]}</span>
             </div>
@@ -93,7 +93,7 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
       </Block>
 
       <Block title="Condiciones del servicio" className="mt-4">
-        <p className="whitespace-pre-line text-[11.5px] leading-relaxed">{o.terms_text || s.terms}</p>
+        <p className="whitespace-pre-line text-[11.5px] leading-relaxed text-slate-700">{o.terms_text || s.terms}</p>
       </Block>
 
       <div className="grid grid-cols-2 gap-10 mt-6">
@@ -102,14 +102,14 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
             // eslint-disable-next-line @next/next/no-img-element
             <img src={`/api/media/${o.intake_signature}`} alt="Firma" className="h-20" />
           )}
-          <p className="border-t border-ink pt-1">Firma del cliente · acepta condiciones y estado del equipo</p>
+          <p className="border-t border-slate-900 pt-1">Firma del cliente · acepta condiciones y estado del equipo</p>
         </div>
         <div>
           {o.delivery_signature && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={`/api/media/${o.delivery_signature}`} alt="Firma de recibido" className="h-20" />
           )}
-          <p className="border-t border-ink pt-1">
+          <p className="border-t border-slate-900 pt-1">
             Recibido a satisfacción{o.delivered_at ? ` · ${dateTime(o.delivered_at)} · ${o.delivered_to}` : ""}
           </p>
         </div>
@@ -121,7 +121,7 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
 function Block({ title, children, className = "" }: { title: string; children: React.ReactNode; className?: string }) {
   return (
     <section className={className}>
-      <h2 className="text-[11px] font-bold uppercase tracking-wide text-muted mb-1">{title}</h2>
+      <h2 className="text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1">{title}</h2>
       {children}
     </section>
   );

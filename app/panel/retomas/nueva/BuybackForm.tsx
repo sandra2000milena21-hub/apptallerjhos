@@ -7,6 +7,7 @@ import { findCustomerByPhone } from "../../caja/actions";
 import { BUYBACK_CHECKS, DEVICE_TYPES, GRADES, deviceType } from "@/lib/constants";
 import SignaturePad from "@/components/SignaturePad";
 import ScanButton from "@/components/Scanner";
+import Combobox from "@/components/Combobox";
 
 const num = (v: string) => parseInt(v.replace(/\D/g, "") || "0", 10);
 const fmt = (n: number) => (n ? "$" + n.toLocaleString("es-CO") : "");
@@ -66,7 +67,16 @@ export default function BuybackForm() {
         <p className="section-title">Equipo</p>
         <div className="flex flex-wrap gap-2">
           {DEVICE_TYPES.map((t) => (
-            <button key={t.key} type="button" onClick={() => setDevice({ ...device, device_type: t.key, brand: "", model: "" })} className={`rounded-xl border px-3 min-h-11 font-semibold text-sm ${device.device_type === t.key ? "bg-ink text-white border-ink" : "bg-white border-line"}`}>
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setDevice({ ...device, device_type: t.key, brand: "", model: "" })}
+              className={`rounded-2xl border px-3.5 min-h-11 font-semibold text-sm transition-all ${
+                device.device_type === t.key
+                  ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-blue-400 shadow-md shadow-blue-500/20"
+                  : "bg-white/[0.04] border-white/[0.08] text-slate-300 hover:bg-white/[0.08] hover:text-white"
+              }`}
+            >
               {t.icon} {t.label}
             </button>
           ))}
@@ -74,17 +84,28 @@ export default function BuybackForm() {
         <div className="grid sm:grid-cols-3 gap-4">
           <div>
             <label className="label">Marca</label>
-            <input className="input" list="bb-marcas" value={device.brand} onChange={(e) => setDevice({ ...device, brand: e.target.value })} />
-            <datalist id="bb-marcas">{dt.brands.map((b) => <option key={b} value={b} />)}</datalist>
+            <Combobox
+              value={device.brand}
+              onChange={(b) => setDevice({ ...device, brand: b })}
+              options={dt.brands}
+              placeholder="Seleccionar marca…"
+            />
           </div>
           <div className="sm:col-span-2">
             <label className="label">Modelo</label>
-            <input className="input" list="bb-modelos" value={device.model} onChange={(e) => setDevice({ ...device, model: e.target.value })} />
-            <datalist id="bb-modelos">{dt.models.map((m) => <option key={m} value={m} />)}</datalist>
+            <Combobox
+              value={device.model}
+              onChange={(m) => {
+                const matchedBrand = dt.brands.find((b) => m.toLowerCase().includes(b.toLowerCase()));
+                setDevice((prev) => ({ ...prev, model: m, brand: prev.brand || matchedBrand || prev.brand }));
+              }}
+              options={dt.models}
+              placeholder={dt.models[0] || "Selecciona o escribe el modelo…"}
+            />
           </div>
           <div>
             <label className="label">Capacidad</label>
-            <input className="input" value={device.capacity} onChange={(e) => setDevice({ ...device, capacity: e.target.value })} />
+            <input className="input" value={device.capacity} onChange={(e) => setDevice({ ...device, capacity: e.target.value })} placeholder="128 GB" />
           </div>
           <div>
             <label className="label">Color</label>
@@ -92,10 +113,10 @@ export default function BuybackForm() {
           </div>
           <div>
             <label className="label">Serial</label>
-            <input className="input font-mono" value={device.serial} onChange={(e) => setDevice({ ...device, serial: e.target.value })} />
+            <input className="input font-mono" autoCapitalize="characters" value={device.serial} onChange={(e) => setDevice({ ...device, serial: e.target.value })} />
           </div>
           <div className="sm:col-span-3">
-            <label className="label">IMEI</label>
+            <label className="label">{device.device_type === "celular" ? "IMEI (marcar *#06#)" : "IMEI (si tiene)"}</label>
             <div className="flex gap-2">
               <input className="input font-mono" inputMode="numeric" value={device.imei} onChange={(e) => setDevice({ ...device, imei: e.target.value })} />
               <ScanButton label="" onResult={(t) => setDevice((d) => ({ ...d, imei: t }))} />
@@ -109,9 +130,21 @@ export default function BuybackForm() {
         <p className="section-title">Revisión y grado</p>
         <div className="grid sm:grid-cols-2 gap-2">
           {BUYBACK_CHECKS.map((c) => (
-            <label key={c.key} className="flex items-center gap-3 rounded-xl border border-line bg-white p-3">
-              <input type="checkbox" className="size-5" checked={Boolean(checks[c.key])} onChange={(e) => setChecks({ ...checks, [c.key]: e.target.checked })} />
-              <span className="font-medium">{c.label}</span>
+            <label
+              key={c.key}
+              className={`flex items-center gap-3 rounded-2xl border p-3.5 transition cursor-pointer ${
+                checks[c.key]
+                  ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-200"
+                  : "bg-white/[0.04] border-white/[0.08] text-slate-300 hover:bg-white/[0.08]"
+              }`}
+            >
+              <input
+                type="checkbox"
+                className="size-5 rounded"
+                checked={Boolean(checks[c.key])}
+                onChange={(e) => setChecks({ ...checks, [c.key]: e.target.checked })}
+              />
+              <span className="font-semibold text-sm">{c.label}</span>
             </label>
           ))}
         </div>
@@ -119,7 +152,16 @@ export default function BuybackForm() {
           <label className="label">Grado (sugerido: {suggested})</label>
           <div className="flex flex-wrap gap-2">
             {GRADES.map((g) => (
-              <button key={g.key} type="button" onClick={() => setGrade(g.key)} className={`rounded-xl border px-3 min-h-11 font-semibold text-sm ${(grade || suggested) === g.key ? "bg-ink text-white border-ink" : "bg-white border-line"}`}>
+              <button
+                key={g.key}
+                type="button"
+                onClick={() => setGrade(g.key)}
+                className={`rounded-2xl border px-3.5 min-h-11 font-semibold text-sm transition-all ${
+                  (grade || suggested) === g.key
+                    ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-blue-400 shadow-md shadow-blue-500/20"
+                    : "bg-white/[0.04] border-white/[0.08] text-slate-300 hover:bg-white/[0.08] hover:text-white"
+                }`}
+              >
                 {g.label}
               </button>
             ))}

@@ -68,12 +68,12 @@ export default function PurchaseForm() {
           <ScanButton label="" onResult={scanned} />
         </div>
         {results.length > 0 && (
-          <ul className="absolute z-10 mt-1 w-full rounded-xl border border-line divide-y divide-line bg-white shadow-lg max-h-64 overflow-y-auto">
+          <ul className="absolute z-10 mt-1 w-full rounded-2xl border border-white/[0.12] divide-y divide-white/[0.06] bg-[#0f1b2c] shadow-2xl max-h-64 overflow-y-auto">
             {results.map((p) => (
               <li key={p.id}>
-                <button type="button" className="w-full text-left px-3 py-2 hover:bg-paper flex justify-between" onClick={() => add(p)}>
-                  <span>{p.name}</span>
-                  <span className="text-sm text-muted">{p.stock} en stock</span>
+                <button type="button" className="w-full text-left px-3.5 py-2.5 hover:bg-white/[0.06] text-white flex justify-between gap-2 transition" onClick={() => add(p)}>
+                  <span className="font-medium">{p.name}</span>
+                  <span className="text-sm text-slate-400">{p.stock} en stock</span>
                 </button>
               </li>
             ))}

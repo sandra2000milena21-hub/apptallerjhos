@@ -33,30 +33,30 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
         )}
       </div>
       <style>{`@media print { @page { size: 80mm auto; margin: 4mm; } }`}</style>
-      <div className="bg-white mx-auto p-5 text-[13px] leading-snug print:p-0" style={{ width: "80mm" }}>
+      <div className="bg-white text-slate-900 mx-auto p-5 text-[13px] leading-snug print:p-0 rounded-2xl shadow-2xl print:shadow-none" style={{ width: "80mm" }}>
         <div className="text-center">
           <p className="font-bold text-base">{s.shop_name}</p>
           <p>{s.shop_address}</p>
           {s.shop_phone && <p>Tel. {s.shop_phone}</p>}
         </div>
-        <div className="border-y border-dashed border-ink/40 my-2 py-1.5">
+        <div className="border-y border-dashed border-slate-400 my-2 py-1.5">
           <p className="flex justify-between"><span>Venta</span><b className="font-mono">{sale.number}</b></p>
           <p>{dateTime(sale.created_at)} · {sale.user_name}</p>
           {sale.customer_name && <p>Cliente: {sale.customer_name}</p>}
-          {sale.status === "anulada" && <p className="font-bold text-bad">VENTA ANULADA</p>}
+          {sale.status === "anulada" && <p className="font-bold text-rose-600">VENTA ANULADA</p>}
         </div>
         {items.map((it) => (
           <div key={it.id} className="py-0.5">
             <p>{it.description}</p>
-            <p className="flex justify-between text-muted"><span>{it.qty} × {money(it.unit_price)}</span><span className="text-ink">{money(it.qty * it.unit_price)}</span></p>
+            <p className="flex justify-between text-slate-500"><span>{it.qty} × {money(it.unit_price)}</span><span className="text-slate-900 font-semibold">{money(it.qty * it.unit_price)}</span></p>
           </div>
         ))}
-        <div className="border-t border-dashed border-ink/40 mt-2 pt-1.5 space-y-0.5">
+        <div className="border-t border-dashed border-slate-400 mt-2 pt-1.5 space-y-0.5">
           {sale.discount > 0 && <p className="flex justify-between"><span>Descuento</span><span>-{money(sale.discount)}</span></p>}
           <p className="flex justify-between font-bold text-base"><span>Total</span><span>{money(sale.total)}</span></p>
           {pays.map((p, i) => <p key={i} className="flex justify-between"><span>{p.method}</span><span>{money(p.amount)}</span></p>)}
         </div>
-        <p className="text-center mt-3 text-[11px]">Documento interno, no es factura electrónica. ¡Gracias por tu compra!</p>
+        <p className="text-center mt-3 text-[11px] text-slate-500">Documento interno, no es factura electrónica. ¡Gracias por tu compra!</p>
       </div>
     </div>
   );

@@ -41,6 +41,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     "Content-Type": media.mime,
     "Accept-Ranges": "bytes",
     "Cache-Control": "private, max-age=86400",
+    "X-Content-Type-Options": "nosniff",
   };
   if (req.nextUrl.searchParams.get("download")) {
     baseHeaders["Content-Disposition"] = `attachment; filename="${media.filename}"`;
@@ -86,6 +87,7 @@ async function serveBlob(req: NextRequest, media: Media) {
     "Content-Type": media.mime,
     "Accept-Ranges": "bytes",
     "Cache-Control": "private, max-age=86400",
+    "X-Content-Type-Options": "nosniff",
   };
   const len = h.get("content-length");
   if (len) headers["Content-Length"] = len;

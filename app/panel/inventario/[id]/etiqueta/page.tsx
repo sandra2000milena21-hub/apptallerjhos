@@ -23,7 +23,7 @@ export default async function ProductLabels({ params, searchParams }: { params: 
       </form>
       <div className="flex flex-wrap gap-3">
         {Array.from({ length: n }).map((_, i) => (
-          <div key={i} className="label bg-white border border-line rounded" style={{ width: "50mm", height: "25mm", padding: "1.5mm 2mm" }}>
+          <div key={i} className="label bg-white text-slate-950 border border-slate-300 shadow-md print:shadow-none rounded" style={{ width: "50mm", height: "25mm", padding: "1.5mm 2mm" }}>
             <p className="truncate font-semibold" style={{ fontSize: "7pt" }}>{p.name}</p>
             <div style={{ height: "10mm" }} className="[&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: svg }} />
             <div className="flex justify-between" style={{ fontSize: "7pt" }}>

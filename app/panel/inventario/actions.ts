@@ -71,7 +71,8 @@ export async function adjustStock(fd: FormData) {
 }
 
 export async function archiveProduct(fd: FormData) {
-  await requireUser();
+  const user = await requireUser();
+  if (user.role === "tecnico") throw new Error("No tienes permisos para archivar productos.");
   const id = parseInt(String(fd.get("id")), 10);
   (await dbx.run("UPDATE products SET active = 0 WHERE id = ?", id));
   revalidatePath("/panel/inventario");
@@ -106,7 +107,8 @@ export async function saveCatalogItem(fd: FormData) {
 }
 
 export async function deleteCatalogItem(fd: FormData) {
-  await requireUser();
+  const user = await requireUser();
+  if (user.role === "tecnico") throw new Error("No tienes permisos para eliminar ítems del catálogo.");
   (await dbx.run("UPDATE repair_catalog SET active = 0 WHERE id = ?", parseInt(String(fd.get("id")), 10)));
   revalidatePath("/panel/inventario/catalogo");
 }

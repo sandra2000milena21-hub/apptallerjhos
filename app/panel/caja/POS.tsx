@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createSale, findCustomerByPhone, findOrderForCheckout, type SaleLine } from "./actions";
 import { searchProductsAction } from "../inventario/actions";
@@ -16,6 +16,7 @@ const num = (v: string) => parseInt(v.replace(/\D/g, "") || "0", 10);
 
 export default function POS({ initialOrder }: { initialOrder: OrderLineInfo | null }) {
   const router = useRouter();
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [lines, setLines] = useState<SaleLine[]>(
     initialOrder && initialOrder.balance > 0
       ? [{ type: "order", orderId: initialOrder.orderId, description: initialOrder.description, qty: 1, unitPrice: initialOrder.balance }]
@@ -32,6 +33,19 @@ export default function POS({ initialOrder }: { initialOrder: OrderLineInfo | nu
   const [payments, setPayments] = useState<{ method: string; amount: number }[]>([{ method: "Efectivo", amount: 0 }]);
   const [msg, setMsg] = useState<string | null>(null);
   const [pending, start] = useTransition();
+
+  // Atajo de teclado: F2 para enfocar el buscador
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "F2") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   const subtotal = lines.reduce((s, l) => s + l.qty * l.unitPrice, 0);
   const total = Math.max(subtotal - discount, 0);
@@ -53,14 +67,37 @@ export default function POS({ initialOrder }: { initialOrder: OrderLineInfo | nu
     });
     setQ("");
     setResults([]);
+    searchInputRef.current?.focus();
   }
   async function scanned(code: string) {
     setMsg(null);
-    const r = await searchProductsAction(code);
-    if (r[0] && (r[0].barcode === code || r.length === 1)) return addProduct(r[0]);
-    const o = await findOrderForCheckout(code);
-    if (o) return addOrder(o);
-    setMsg(`No se encontró el código ${code}.`);
+    const clean = code.trim();
+    if (!clean) return;
+
+    // Si tiene prefijo o formato de orden R-XXXX, priorizar búsqueda de orden
+    if (/^r-?\d+/i.test(clean)) {
+      const o = await findOrderForCheckout(clean);
+      if (o) {
+        addOrder(o);
+        searchInputRef.current?.focus();
+        return;
+      }
+    }
+
+    const r = await searchProductsAction(clean);
+    if (r[0] && (r[0].barcode === clean || r.length === 1)) {
+      addProduct(r[0]);
+      searchInputRef.current?.focus();
+      return;
+    }
+    const o = await findOrderForCheckout(clean);
+    if (o) {
+      addOrder(o);
+      searchInputRef.current?.focus();
+      return;
+    }
+    setMsg(`No se encontró el producto u orden con código "${clean}".`);
+    searchInputRef.current?.focus();
   }
   function addOrder(o: OrderLineInfo) {
     if (o.balance <= 0) return setMsg(`La orden ${o.number} no tiene saldo pendiente.`);
@@ -68,6 +105,7 @@ export default function POS({ initialOrder }: { initialOrder: OrderLineInfo | nu
     setLines((l) => [...l, { type: "order", orderId: o.orderId, description: o.description, qty: 1, unitPrice: o.balance }]);
     if (!customer) setCustomer(o.customer);
     setOrderCode("");
+    searchInputRef.current?.focus();
   }
   async function lookupOrder() {
     setMsg(null);
@@ -105,9 +143,13 @@ export default function POS({ initialOrder }: { initialOrder: OrderLineInfo | nu
       <div className="space-y-4 min-w-0">
         <div className="card p-4 space-y-3">
           <div className="relative">
-            <label className="label">Producto (busca o escanea)</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="label mb-0">Producto (busca o escanea)</label>
+              <kbd className="text-[11px] font-mono text-muted bg-white/5 px-2 py-0.5 rounded border border-white/10" title="Atajo para enfocar">F2</kbd>
+            </div>
             <div className="flex gap-2">
               <input
+                ref={searchInputRef}
                 className="input"
                 value={q}
                 onChange={(e) => search(e.target.value)}
@@ -231,13 +273,42 @@ export default function POS({ initialOrder }: { initialOrder: OrderLineInfo | nu
         <div className="space-y-2">
           <p className="label">Pago</p>
           {payments.map((p, i) => (
-            <div key={i} className="flex gap-2">
-              <select className="input !min-h-11" value={p.method} onChange={(e) => setPayments((ps) => ps.map((x, j) => (j === i ? { ...x, method: e.target.value } : x)))}>
-                {PAYMENT_METHODS.filter((m) => m !== "Wompi").map((m) => <option key={m}>{m}</option>)}
-              </select>
-              <input className="input !min-h-11 text-right" inputMode="numeric" value={p.amount ? p.amount.toLocaleString("es-CO") : ""} onChange={(e) => setPayments((ps) => ps.map((x, j) => (j === i ? { ...x, amount: num(e.target.value) } : x)))} placeholder={payments.length === 1 ? fmt(total) : "$0"} />
-              <button type="button" className="btn-ghost !min-h-11 !px-2.5 text-sm" title="Completar con lo que falta" onClick={() => fillRemaining(i)}>Resto</button>
-              {payments.length > 1 && <button type="button" className="text-muted text-xl px-1" onClick={() => setPayments((ps) => ps.filter((_, j) => j !== i))}>×</button>}
+            <div key={i} className="space-y-1.5">
+              <div className="flex gap-2">
+                <select className="input !min-h-11" value={p.method} onChange={(e) => setPayments((ps) => ps.map((x, j) => (j === i ? { ...x, method: e.target.value } : x)))}>
+                  {PAYMENT_METHODS.filter((m) => m !== "Wompi").map((m) => <option key={m}>{m}</option>)}
+                </select>
+                <input className="input !min-h-11 text-right" inputMode="numeric" value={p.amount ? p.amount.toLocaleString("es-CO") : ""} onChange={(e) => setPayments((ps) => ps.map((x, j) => (j === i ? { ...x, amount: num(e.target.value) } : x)))} placeholder={payments.length === 1 ? fmt(total) : "$0"} />
+                <button type="button" className="btn-ghost !min-h-11 !px-2.5 text-sm" title="Completar con lo que falta" onClick={() => fillRemaining(i)}>Resto</button>
+                {payments.length > 1 && <button type="button" className="text-muted text-xl px-1" onClick={() => setPayments((ps) => ps.filter((_, j) => j !== i))}>×</button>}
+              </div>
+              {p.method === "Efectivo" && total > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                  <span className="text-[11px] text-muted mr-0.5">Billetes:</span>
+                  <button
+                    type="button"
+                    className="px-2 py-0.5 text-xs font-semibold rounded bg-white/10 hover:bg-white/20 text-slate-200 transition"
+                    onClick={() => {
+                      const others = payments.reduce((s, x, j) => (j === i ? s : s + x.amount), 0);
+                      setPayments((ps) => ps.map((x, j) => (j === i ? { ...x, amount: Math.max(0, total - others) } : x)));
+                    }}
+                  >
+                    Exacto
+                  </button>
+                  {[10000, 20000, 50000, 100000].map((bill) => (
+                    <button
+                      key={bill}
+                      type="button"
+                      className="px-2 py-0.5 text-xs font-semibold rounded bg-white/10 hover:bg-white/20 text-slate-200 transition"
+                      onClick={() => {
+                        setPayments((ps) => ps.map((x, j) => (j === i ? { ...x, amount: bill } : x)));
+                      }}
+                    >
+                      ${bill >= 1000 ? `${bill / 1000}k` : bill}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
           <button type="button" className="text-sm font-semibold text-accent" onClick={() => setPayments((ps) => [...ps, { method: "Transferencia", amount: 0 }])}>+ Dividir pago</button>

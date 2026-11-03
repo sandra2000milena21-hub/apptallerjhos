@@ -1,8 +1,17 @@
-# Taller · recepción, reparación, caja e inventario
+# Taller · Versión 3.0 (POS, Taller & Reparaciones)
 
 Sistema web para un local de reparación y venta de tecnología: celulares, tablets, computadores, consolas y relojes. Está pensado para usarse en un **iPad en el mostrador**, y el cliente sigue su reparación desde su celular.
 
 Toma como base **SpotsPOS** (Repair Spots), con lo mejor de **RepairDesk** y otras plataformas, adaptado a Colombia (Ley 1480 de 2011, Ley 1581 de 2012, WhatsApp, Wompi, pesos).
+
+## Novedades de la Versión 3.0
+
+- 🛡️ **Seguridad y Control de Roles (RBAC)**: Validación estricta a nivel de Server Actions en todas las mutaciones críticas (anulación de ventas y retomas, archivo de inventario y registro de gastos). Bloqueo de cargas SVG para evitar XSS almacenado.
+- ⚡ **Máxima Fluidez en Mostrador**: 12 índices de alto rendimiento en SQLite para consultas instantáneas en el tablero diario, reportes y búsquedas. Atajo rápido `F2` para enfocar el buscador de caja y auto-enfoque tras cada escaneo.
+- 💵 **Caja de Alta Velocidad**: Billetes de denominación colombiana con un toque (`Exacto`, `+$10k`, `+$20k`, `+$50k`, `+$100k`), compatibilidad ampliada con lectores de códigos de barras físicos e integración directa de cobro de órdenes `R-XXXX`.
+- 📦 **Control de Stock Inteligente**: Cuando una cotización es rechazada (por el cliente en línea o en el taller), los repuestos reservados se reintegran automáticamente al inventario sin desajustes manuales.
+- 🖨️ **Impresión Térmica y Etiquetas Optimizadas**: Contraste perfecto para tickets de 80mm, hojas de servicio, comprobantes de retoma y etiquetas de código de barras.
+- 👥 **Deduplicación de Clientes**: Búsqueda y vinculación automática por celular para evitar registros duplicados en caja y recepción.
 
 ## Módulos
 

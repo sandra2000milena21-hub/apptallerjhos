@@ -11,7 +11,15 @@ export async function findOrderForCheckout(code: string) {
   await requireUser();
   const c = code.trim().toUpperCase();
   if (!c) return null;
-  const row = (await dbx.get("SELECT id FROM orders WHERE upper(number) = ? OR number LIKE ? ORDER BY id DESC LIMIT 1", c, `%-${c.replace(/\D/g, "").padStart(4, "0")}`)) as { id: number } | undefined;
+  const numDigits = c.replace(/\D/g, "");
+  const padded = numDigits ? numDigits.padStart(4, "0") : "";
+  const row = (await dbx.get(
+    "SELECT id FROM orders WHERE upper(number) = ? OR (? != '' AND (number LIKE ? OR number LIKE ?)) ORDER BY id DESC LIMIT 1",
+    c,
+    padded,
+    `%-${padded}`,
+    `%${padded}`,
+  )) as { id: number } | undefined;
   if (!row) return null;
   return orderLine(row.id);
 }
@@ -69,6 +77,10 @@ export async function createSale(input: {
   const payments = input.payments.filter((p) => p.amount > 0 && PAYMENT_METHODS.includes(p.method));
   const paid = payments.reduce((s, p) => s + p.amount, 0);
   if (paid < total) return { ok: false, error: `Faltan $${(total - paid).toLocaleString("es-CO")} por pagar.` };
+  const nonCash = payments.filter((p) => p.method !== "Efectivo").reduce((s, p) => s + p.amount, 0);
+  if (nonCash > total) {
+    return { ok: false, error: "Los pagos electrónicos o con tarjeta no pueden ser mayores al total de la venta." };
+  }
   const orderLines = lines.filter((l) => l.type === "order");
   if (orderLines.length && discount > 0) return { ok: false, error: "No se puede aplicar descuento al cobro de una orden; ajusta la cotización." };
 
@@ -83,6 +95,16 @@ export async function createSale(input: {
   try {
     const id = await tx(async (t) => {
       let customerId = input.customerId;
+      if (!customerId && input.newCustomer?.phone) {
+        const d = input.newCustomer.phone.replace(/\D/g, "");
+        if (d.length >= 7) {
+          const existing = (await t.get(
+            "SELECT id FROM customers WHERE replace(replace(phone,' ',''),'-','') LIKE ? LIMIT 1",
+            `%${d.slice(-10)}`,
+          )) as { id: number } | undefined;
+          if (existing) customerId = existing.id;
+        }
+      }
       if (!customerId && input.newCustomer?.name && input.newCustomer.phone) {
         customerId = Number((await t.run("INSERT INTO customers (name, phone) VALUES (?, ?)", input.newCustomer.name, input.newCustomer.phone)).lastInsertRowid);
       }
@@ -136,6 +158,7 @@ export async function createSale(input: {
 
 export async function voidSale(fd: FormData) {
   const user = await requireUser();
+  if (user.role === "tecnico") throw new Error("No tienes permisos para anular ventas.");
   const id = parseInt(String(fd.get("id")), 10);
   const sale = (await dbx.get("SELECT * FROM sales WHERE id = ?", id)) as { id: number; number: string; status: string; customer_id: number | null } | undefined;
   if (!sale || sale.status === "anulada") return;

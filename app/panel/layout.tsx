@@ -34,9 +34,14 @@ export default async function PanelLayout({ children }: { children: React.ReactN
             <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center font-black text-white text-sm shadow-md shadow-blue-500/20 group-hover:scale-105 transition">
               ⚡
             </div>
-            <span className="font-bold tracking-tight text-[16px] text-white truncate max-w-36 group-hover:text-blue-300 transition">
-              {s.shop_name}
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="font-bold tracking-tight text-[16px] text-white truncate max-w-36 group-hover:text-blue-300 transition">
+                {s.shop_name}
+              </span>
+              <span className="text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded-md bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                v3.0
+              </span>
+            </div>
           </Link>
 
           <NavLinks links={links} />

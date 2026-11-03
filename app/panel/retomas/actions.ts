@@ -75,6 +75,7 @@ export async function createBuyback(input: BuybackInput): Promise<{ ok: true; id
 
 export async function voidBuyback(fd: FormData) {
   const user = await requireUser();
+  if (user.role !== "admin") throw new Error("Solo el administrador puede anular retomas.");
   const id = parseInt(String(fd.get("id")), 10);
   const b = (await dbx.get("SELECT * FROM buybacks WHERE id = ?", id)) as { id: number; number: string; status: string; product_id: number; payout: string; price: number; customer_id: number } | undefined;
   if (!b || b.status === "anulada") return;

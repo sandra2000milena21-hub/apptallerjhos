@@ -25,7 +25,7 @@ export default async function LabelPage({ params, searchParams }: { params: Prom
       </div>
       <div className="flex flex-wrap gap-4">
         {Array.from({ length: copies }).map((_, i) => (
-          <div key={i} className="label bg-white border border-line rounded-md overflow-hidden" style={{ width: "62mm", height: "29mm", padding: "1.5mm 2.5mm" }}>
+          <div key={i} className="label bg-white text-slate-950 border border-slate-300 shadow-md print:shadow-none rounded-md overflow-hidden" style={{ width: "62mm", height: "29mm", padding: "1.5mm 2.5mm" }}>
             <div className="flex justify-between items-baseline" style={{ fontSize: "7pt" }}>
               <span className="font-bold truncate">{s.shop_name}</span>
               <span>{dateOnly(o.created_at)}</span>

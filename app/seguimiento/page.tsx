@@ -12,6 +12,11 @@ async function lookup(fd: FormData) {
   "use server";
   const ip = (await headers()).get("x-forwarded-for")?.split(",")[0].trim() || "local";
   const now = Date.now();
+  if (attempts.size > 500) {
+    for (const [k, v] of attempts) {
+      if (now - v.since > 30 * 60_000) attempts.delete(k);
+    }
+  }
   const a = attempts.get(ip);
   if (a && now - a.since < 15 * 60_000 && a.n >= 10) redirect("/seguimiento?error=limite");
   attempts.set(ip, a && now - a.since < 15 * 60_000 ? { n: a.n + 1, since: a.since } : { n: 1, since: now });

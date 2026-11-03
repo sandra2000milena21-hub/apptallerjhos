@@ -17,7 +17,7 @@ function resolveDataDir(): string {
 
 export const DATA_DIR = resolveDataDir();
 export const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
-const SCHEMA_VERSION = "3";
+const SCHEMA_VERSION = "4";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -102,6 +102,8 @@ CREATE TABLE IF NOT EXISTS orders (
   delivered_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer_id);
+CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at);
 CREATE TABLE IF NOT EXISTS quote_items (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
@@ -111,6 +113,7 @@ CREATE TABLE IF NOT EXISTS quote_items (
   qty INTEGER NOT NULL DEFAULT 1,
   unit_cost INTEGER NOT NULL DEFAULT 0
 );
+CREATE INDEX IF NOT EXISTS idx_quote_items_order ON quote_items(order_id);
 CREATE TABLE IF NOT EXISTS payments (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
@@ -119,9 +122,11 @@ CREATE TABLE IF NOT EXISTS payments (
   note TEXT,
   sale_id INTEGER,
   external_ref TEXT,
-  user_id INTEGER REFERENCES users(id),
+  user_id REFERENCES users(id),
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE INDEX IF NOT EXISTS idx_payments_order ON payments(order_id);
+CREATE INDEX IF NOT EXISTS idx_payments_created ON payments(created_at);
 CREATE TABLE IF NOT EXISTS events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
@@ -203,6 +208,8 @@ CREATE TABLE IF NOT EXISTS sales (
   user_id INTEGER REFERENCES users(id),
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE INDEX IF NOT EXISTS idx_sales_customer ON sales(customer_id);
+CREATE INDEX IF NOT EXISTS idx_sales_created ON sales(created_at);
 CREATE TABLE IF NOT EXISTS sale_items (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   sale_id INTEGER NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
@@ -213,12 +220,14 @@ CREATE TABLE IF NOT EXISTS sale_items (
   unit_price INTEGER NOT NULL,
   unit_cost INTEGER NOT NULL DEFAULT 0
 );
+CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items(sale_id);
 CREATE TABLE IF NOT EXISTS sale_payments (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   sale_id INTEGER NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
   method TEXT NOT NULL,
   amount INTEGER NOT NULL
 );
+CREATE INDEX IF NOT EXISTS idx_sale_payments_sale ON sale_payments(sale_id);
 CREATE TABLE IF NOT EXISTS buybacks (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   number TEXT NOT NULL UNIQUE,
@@ -242,6 +251,7 @@ CREATE TABLE IF NOT EXISTS buybacks (
   user_id INTEGER REFERENCES users(id),
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE INDEX IF NOT EXISTS idx_buybacks_created ON buybacks(created_at);
 CREATE TABLE IF NOT EXISTS appointments (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
@@ -257,6 +267,7 @@ CREATE TABLE IF NOT EXISTS appointments (
   order_id INTEGER REFERENCES orders(id),
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE INDEX IF NOT EXISTS idx_appointments_date ON appointments(date);
 CREATE TABLE IF NOT EXISTS expenses (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   description TEXT NOT NULL,
@@ -266,6 +277,7 @@ CREATE TABLE IF NOT EXISTS expenses (
   user_id INTEGER REFERENCES users(id),
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE INDEX IF NOT EXISTS idx_expenses_created ON expenses(created_at);
 CREATE TABLE IF NOT EXISTS notifications (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE,
