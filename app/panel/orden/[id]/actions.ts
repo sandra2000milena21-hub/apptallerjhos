@@ -31,13 +31,22 @@ export async function changeStatus(fd: FormData) {
   const note = String(fd.get("note") || "").trim();
   const isPublic = fd.get("public") === "on";
   const sets = ["status = ?"];
-  if (status === "listo") sets.push("ready_at = datetime('now')");
-  (await dbx.run(`UPDATE orders SET ${sets.join(", ")} WHERE id = ?`, status, id));
+  const params: unknown[] = [status];
+  if (status === "listo") {
+    sets.push("ready_at = datetime('now')");
+  }
+  if (status === "entregado") {
+    sets.push("delivered_at = datetime('now')");
+    sets.push("delivered_to = coalesce(delivered_to, (SELECT name FROM customers WHERE id = (SELECT customer_id FROM orders WHERE id = ?)))");
+    params.push(id);
+  }
+  params.push(id);
+  (await dbx.run(`UPDATE orders SET ${sets.join(", ")} WHERE id = ?`, ...params));
   await addEvent({
     orderId: id,
     type: "status",
     status,
-    body: note ? `${statusInfo(status).label}. ${note}` : statusInfo(status).label,
+    body: note ? `${statusInfo(status).label}. ${note}` : (status === "entregado" ? "Equipo entregado al cliente." : statusInfo(status).label),
     isPublic: true,
     userId: user.id,
   });

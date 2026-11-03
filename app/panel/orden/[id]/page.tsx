@@ -93,21 +93,26 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
         <input type="hidden" name="orderId" value={o.id} />
         <p className="section-title">Cambiar estado</p>
         <div className="flex flex-wrap gap-2">
-          {STATUSES.filter((st) => st.key !== "entregado").map((st) => (
-            <button
-              key={st.key}
-              name="status"
-              value={st.key}
-              disabled={delivered}
-              className={`rounded-2xl border px-3.5 min-h-11 text-sm font-semibold transition-all ${
-                o.status === st.key
-                  ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-blue-400 shadow-md shadow-blue-500/20"
-                  : "bg-white/[0.04] border-white/[0.08] text-slate-300 hover:bg-white/[0.08] hover:text-white"
-              }`}
-            >
-              {st.short}
-            </button>
-          ))}
+          {STATUSES.map((st) => {
+            const isDeliver = st.key === "entregado";
+            return (
+              <button
+                key={st.key}
+                name="status"
+                value={st.key}
+                disabled={delivered && isDeliver}
+                className={`rounded-2xl border px-3.5 min-h-11 text-sm font-semibold transition-all ${
+                  o.status === st.key
+                    ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-blue-400 shadow-md shadow-blue-500/20"
+                    : isDeliver
+                    ? "bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white border-emerald-400/40 shadow-lg shadow-emerald-950/50 font-black"
+                    : "bg-white/[0.04] border-white/[0.08] text-slate-300 hover:bg-white/[0.08] hover:text-white"
+                }`}
+              >
+                {isDeliver ? "✅ Entregado" : st.short}
+              </button>
+            );
+          })}
         </div>
         <div className="flex flex-wrap gap-3 items-center">
           <input name="note" className="input flex-1 min-w-64" placeholder="Nota opcional con el cambio (ej. se pidió el repuesto, llega el jueves)" />
@@ -433,10 +438,8 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
                 )}
                 <p className="text-sm text-muted">Garantía hasta el {dateOnly(addMonths(o.delivered_at!, o.warranty_months))}.</p>
               </div>
-            ) : o.status === "listo" ? (
-              <DeliverForm orderId={o.id} customerName={o.customer_name} balance={t.balance} />
             ) : (
-              <p className="text-sm text-muted">La entrega se habilita cuando la orden está en “Listo para entrega”.</p>
+              <DeliverForm orderId={o.id} customerName={o.customer_name} balance={t.balance} />
             )}
           </section>
         </aside>
