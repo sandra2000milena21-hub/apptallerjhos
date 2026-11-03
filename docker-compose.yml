@@ -1,0 +1,27 @@
+# Para un servidor propio (VPS). Caddy pone el certificado HTTPS automáticamente.
+# 1) Apunta tu dominio (ej. taller.midominio.co) a la IP del servidor.
+# 2) Copia .env.example como .env y llena los valores (PUBLIC_URL=https://taller.midominio.co).
+# 3) Cambia el dominio en el archivo Caddyfile.
+# 4) docker compose up -d --build
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATA_DIR: /data
+    volumes:
+      - ./data:/data
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+    depends_on:
+      - app
+volumes:
+  caddy_data:

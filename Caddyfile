@@ -1,0 +1,6 @@
+taller.midominio.co {
+	request_body {
+		max_size 1GB
+	}
+	reverse_proxy app:3000
+}

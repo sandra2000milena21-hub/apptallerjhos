@@ -1,0 +1,236 @@
+@import "tailwindcss";
+
+@theme {
+  --color-paper: #0b1320;
+  --color-paper-elevated: #0f1a2b;
+  --color-card: #142136;
+  --color-card-hover: #182842;
+  --color-card-border: rgba(255, 255, 255, 0.08);
+  --color-ink: #f8fafc;
+  --color-ink-secondary: #cbd5e1;
+  --color-muted: #8fa0b5;
+  --color-line: rgba(255, 255, 255, 0.09);
+
+  --color-accent: #2563eb;
+  --color-accent-soft: rgba(37, 99, 235, 0.18);
+  --color-accent-glow: #38bdf8;
+
+  --color-good: #10b981;
+  --color-good-soft: rgba(16, 185, 129, 0.18);
+
+  --color-warn: #f59e0b;
+  --color-warn-soft: rgba(245, 158, 11, 0.18);
+
+  --color-bad: #ef4444;
+  --color-bad-soft: rgba(239, 68, 68, 0.18);
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", "Segoe UI", Roboto, sans-serif;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  color-scheme: dark;
+}
+
+body {
+  background-color: #0b1320;
+  background-image: 
+    radial-gradient(ellipse 90% 50% at 50% -15%, rgba(37, 99, 235, 0.18), transparent 70%),
+    radial-gradient(ellipse 50% 35% at 100% 5%, rgba(99, 102, 241, 0.10), transparent 60%),
+    radial-gradient(ellipse 50% 30% at 0% 40%, rgba(14, 165, 233, 0.08), transparent 50%);
+  background-attachment: fixed;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100dvh;
+}
+
+@utility card {
+  background-color: var(--color-card);
+  border: 1px solid var(--color-card-border);
+  border-radius: 1.25rem;
+  box-shadow: 0 10px 30px -8px rgba(0, 0, 0, 0.45), 0 4px 6px -4px rgba(0, 0, 0, 0.25);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@utility card-contrast {
+  background-color: #ffffff;
+  color: #0f172a;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 1.5rem;
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.6);
+}
+
+@utility card-pill {
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 9999px;
+  backdrop-filter: blur(12px);
+}
+
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 min-h-11 text-[15px] font-semibold transition active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none select-none cursor-pointer;
+}
+
+@utility btn-primary {
+  @apply btn bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-500 hover:to-indigo-500 shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 border border-white/10;
+}
+
+@utility btn-accent {
+  @apply btn bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 text-white hover:brightness-110 shadow-lg shadow-indigo-600/30 border border-white/15;
+}
+
+@utility btn-amber {
+  @apply btn bg-amber-500 text-slate-950 font-bold hover:bg-amber-400 shadow-md shadow-amber-500/25 rounded-full;
+}
+
+@utility btn-ghost {
+  @apply btn bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.10] text-slate-200 hover:text-white backdrop-blur-md;
+}
+
+@utility btn-good {
+  @apply btn bg-emerald-600 text-white hover:bg-emerald-500 shadow-lg shadow-emerald-600/30 border border-white/10;
+}
+
+@utility btn-bad {
+  @apply btn bg-rose-500/15 border border-rose-500/30 text-rose-300 hover:bg-rose-500/25;
+}
+
+@utility input {
+  @apply w-full rounded-2xl border border-white/[0.12] bg-[#0e1929]/90 text-white px-4 min-h-12 text-[16px] outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-500/20 placeholder:text-slate-500 transition-all;
+}
+
+@utility label {
+  @apply block text-[13px] font-semibold text-slate-300 mb-1.5;
+}
+
+@utility chip {
+  @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold backdrop-blur-sm;
+}
+
+@utility section-title {
+  @apply text-[18px] font-bold tracking-tight text-white;
+}
+
+textarea.input {
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+  line-height: 1.6;
+}
+
+select.input option {
+  background-color: #0f1b2c;
+  color: #f8fafc;
+}
+
+/* Scrollbar moderno */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(11, 19, 32, 0.4);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+/* Animaciones de Asistente Tecnológico */
+@keyframes cyber-float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes cyber-wiggle {
+  0%, 100% {
+    transform: rotate(0deg) scale(1);
+  }
+  15% {
+    transform: rotate(-10deg) scale(1.12);
+  }
+  30% {
+    transform: rotate(10deg) scale(1.12);
+  }
+  45% {
+    transform: rotate(-6deg) scale(1.06);
+  }
+  60% {
+    transform: rotate(6deg) scale(1.04);
+  }
+  75% {
+    transform: rotate(0deg) scale(1);
+  }
+}
+
+@keyframes radar-pulse {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+}
+
+@keyframes sound-wave-bar {
+  0%, 100% {
+    height: 4px;
+  }
+  50% {
+    height: 18px;
+  }
+}
+
+.animate-cyber-float {
+  animation: cyber-float 3.5s ease-in-out infinite;
+}
+
+.animate-cyber-wiggle {
+  animation: cyber-wiggle 1.2s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+.animate-radar-pulse {
+  animation: radar-pulse 2.2s cubic-bezier(0.24, 0, 0.38, 1) infinite;
+}
+
+.sound-bar {
+  animation: sound-wave-bar 0.8s ease-in-out infinite alternate;
+}
+.sound-bar:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.sound-bar:nth-child(3) {
+  animation-delay: 0.4s;
+}
+.sound-bar:nth-child(4) {
+  animation-delay: 0.15s;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .card {
+    background: white !important;
+    color: black !important;
+    border-color: #ccc !important;
+    box-shadow: none !important;
+  }
+}
