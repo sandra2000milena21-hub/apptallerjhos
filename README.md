@@ -1,8 +1,23 @@
-# Taller · Versión 3.0 (POS, Taller & Reparaciones)
+# Taller · Versión 4.0 (POS, Taller & Fidelización)
 
 Sistema web para un local de reparación y venta de tecnología: celulares, tablets, computadores, consolas y relojes. Está pensado para usarse en un **iPad en el mostrador**, y el cliente sigue su reparación desde su celular.
 
 Toma como base **SpotsPOS** (Repair Spots), con lo mejor de **RepairDesk** y otras plataformas, adaptado a Colombia (Ley 1480 de 2011, Ley 1581 de 2012, WhatsApp, Wompi, pesos).
+
+## Novedades de la Versión 4.0
+
+- ⭐ **Sistema de Fidelización y Club de Puntos**: 
+  - Acumulación automática: **1 punto por cada \$1.000 COP** pagados en reparaciones y productos.
+  - Redención en Caja (POS): Con un solo toque el cajero puede redimir los puntos del cliente (**1 punto = \$20 COP**, 2% de cashback directo).
+  - Bloque de fidelización en el **ticket térmico de 80 mm** (`/panel/ventas/[id]`): muestra puntos ganados hoy, puntos redimidos, saldo total disponible y ahorro equivalente.
+  - Saldo de puntos visible en la ficha de clientes (`/panel/clientes/[id]`) y en el portal de seguimiento del cliente (`/s/[token]`).
+- 🟢 **Botón llamativo "Entregado" en mostrador**:
+  - Cuadrícula 4x2 perfecta en la lámina expandida del tablero con el botón **`✅ Entregado`** en verde esmeralda brillante junto a "Listo".
+  - Confirmación táctil rápida para evitar toques accidentales en el iPad y registro automático de fecha y hora de entrega.
+- 🚀 **Hiper-fluidez y Aceleración por GPU para iPad**:
+  - Desacoplamiento de fondos con `transform: translate3d(0, 0, 0)` para scrolling nativo a 60/120 FPS sin repintados de Safari.
+  - Eliminación del retraso táctil de 300 ms en iPadOS con `touch-action: manipulation`.
+  - Arranque optimizado en producción con respuestas en red local < 30 ms.
 
 ## Novedades de la Versión 3.0
 

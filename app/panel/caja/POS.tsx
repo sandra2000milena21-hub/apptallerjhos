@@ -8,7 +8,7 @@ import ScanButton from "@/components/Scanner";
 import { PAYMENT_METHODS } from "@/lib/constants";
 
 type OrderLineInfo = NonNullable<Awaited<ReturnType<typeof findOrderForCheckout>>>;
-type Customer = { id: number; name: string; phone: string; credit: number };
+type Customer = { id: number; name: string; phone: string; credit: number; points?: number };
 type Found = Awaited<ReturnType<typeof searchProductsAction>>[number];
 
 const fmt = (n: number) => "$" + Math.round(n).toLocaleString("es-CO");
@@ -23,6 +23,7 @@ export default function POS({ initialOrder }: { initialOrder: OrderLineInfo | nu
       : [],
   );
   const [customer, setCustomer] = useState<Customer | null>(initialOrder?.customer ?? null);
+  const [pointsToRedeem, setPointsToRedeem] = useState(0);
   const [phone, setPhone] = useState("");
   const [newName, setNewName] = useState("");
   const [q, setQ] = useState("");
@@ -132,6 +133,7 @@ export default function POS({ initialOrder }: { initialOrder: OrderLineInfo | nu
         lines,
         discount,
         payments: effective,
+        pointsRedeemed: pointsToRedeem,
       });
       if (r.ok) router.push(`/panel/ventas/${r.id}`);
       else setMsg(r.error);
@@ -243,12 +245,64 @@ export default function POS({ initialOrder }: { initialOrder: OrderLineInfo | nu
         <div>
           <label className="label">Cliente (opcional)</label>
           {customer ? (
-            <div className="flex items-center justify-between rounded-xl bg-paper p-3">
-              <div>
-                <p className="font-semibold">{customer.name}</p>
-                <p className="text-sm text-muted">{customer.phone}{customer.credit > 0 ? ` · saldo a favor ${fmt(customer.credit)}` : ""}</p>
+            <div className="rounded-xl bg-paper p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-semibold">{customer.name}</p>
+                  <p className="text-sm text-muted">
+                    {customer.phone}
+                    {customer.credit > 0 ? ` · saldo a favor ${fmt(customer.credit)}` : ""}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="text-sm text-accent font-semibold"
+                  onClick={() => {
+                    setCustomer(null);
+                    if (pointsToRedeem > 0) {
+                      setDiscount((d) => Math.max(0, d - pointsToRedeem * 20));
+                      setPointsToRedeem(0);
+                    }
+                  }}
+                >
+                  Cambiar
+                </button>
               </div>
-              <button type="button" className="text-sm text-accent font-semibold" onClick={() => setCustomer(null)}>Cambiar</button>
+              {(customer.points ?? 0) > 0 && (
+                <div className="pt-2 border-t border-white/[0.08] flex items-center justify-between gap-2">
+                  <div className="text-xs">
+                    <span className="font-bold text-amber-400">⭐ {customer.points} pts</span>
+                    <span className="text-slate-400"> ({fmt((customer.points ?? 0) * 20)})</span>
+                  </div>
+                  {pointsToRedeem > 0 ? (
+                    <button
+                      type="button"
+                      className="text-xs text-rose-400 hover:text-rose-300 font-semibold"
+                      onClick={() => {
+                        setDiscount((d) => Math.max(0, d - pointsToRedeem * 20));
+                        setPointsToRedeem(0);
+                      }}
+                    >
+                      Quitar descuento
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="px-2.5 py-1 text-xs font-bold rounded-lg bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/30 transition"
+                      onClick={() => {
+                        const maxPointsPossible = Math.floor(subtotal / 20);
+                        const redeemable = Math.min(customer.points ?? 0, maxPointsPossible);
+                        if (redeemable <= 0) return;
+                        const discountVal = redeemable * 20;
+                        setDiscount(discountVal);
+                        setPointsToRedeem(redeemable);
+                      }}
+                    >
+                      Redimir pts ({fmt(Math.min((customer.points ?? 0) * 20, subtotal))})
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           ) : (
             <div className="space-y-2">

@@ -33,7 +33,13 @@ async function orderLine(id: number) {
     number: o.number,
     description: `Orden ${o.number} · ${o.model}`,
     balance: t.balance,
-    customer: { id: o.customer_id, name: o.customer_name, phone: o.customer_phone, credit: await customerCredit(o.customer_id) },
+    customer: {
+      id: o.customer_id,
+      name: o.customer_name,
+      phone: o.customer_phone,
+      credit: await customerCredit(o.customer_id),
+      points: await customerPoints(o.customer_id),
+    },
   };
 }
 
@@ -46,12 +52,19 @@ async function customerCredit(id: number, ex: Exec = dbx) {
   return ((await ex.get("SELECT store_credit FROM customers WHERE id = ?", id)) as { store_credit: number } | undefined)?.store_credit ?? 0;
 }
 
+async function customerPoints(id: number, ex: Exec = dbx) {
+  return ((await ex.get("SELECT COALESCE(points, 0) AS points FROM customers WHERE id = ?", id)) as { points: number } | undefined)?.points ?? 0;
+}
+
 export async function findCustomerByPhone(phone: string) {
   await requireUser();
   const d = phone.replace(/\D/g, "");
   if (d.length < 7) return null;
   return (
-    ((await dbx.get("SELECT id, name, phone, store_credit AS credit FROM customers WHERE replace(replace(phone,' ',''),'-','') LIKE ? ORDER BY id DESC LIMIT 1", `%${d.slice(-10)}`)) as { id: number; name: string; phone: string; credit: number } | undefined) ?? null
+    ((await dbx.get(
+      "SELECT id, name, phone, store_credit AS credit, COALESCE(points, 0) AS points FROM customers WHERE replace(replace(phone,' ',''),'-','') LIKE ? ORDER BY id DESC LIMIT 1",
+      `%${d.slice(-10)}`
+    )) as { id: number; name: string; phone: string; credit: number; points: number } | undefined) ?? null
   );
 }
 
@@ -67,6 +80,7 @@ export async function createSale(input: {
   discount: number;
   payments: { method: string; amount: number }[];
   note?: string;
+  pointsRedeemed?: number;
 }): Promise<{ ok: true; id: number } | { ok: false; error: string }> {
   const user = await requireUser();
   const lines = input.lines.filter((l) => l.qty > 0 && l.unitPrice >= 0);
@@ -115,9 +129,35 @@ export async function createSale(input: {
         (await t.run("UPDATE customers SET store_credit = store_credit - ? WHERE id = ?", creditUsed, customerId));
       }
 
+      // Fidelización: redención de puntos
+      const pointsRedeemed = Math.max(0, Math.round(input.pointsRedeemed || 0));
+      if (pointsRedeemed > 0) {
+        if (!customerId) throw new Error("Para redimir puntos debes seleccionar o registrar un cliente.");
+        const currentPts = await customerPoints(customerId, t);
+        if (currentPts < pointsRedeemed) throw new Error(`El cliente solo tiene ${currentPts} puntos disponibles.`);
+        await t.run("UPDATE customers SET points = points - ? WHERE id = ?", pointsRedeemed, customerId);
+      }
+
+      // Fidelización: acumulación (1 punto por cada $1.000 COP pagados)
+      const pointsEarned = customerId && total > 0 ? Math.floor(total / 1000) : 0;
+      if (pointsEarned > 0 && customerId) {
+        await t.run("UPDATE customers SET points = points + ? WHERE id = ?", pointsEarned, customerId);
+      }
+
       const number = await nextNumber("sale_prefix", "next_sale", "V-", t);
       const saleId = Number(
-        (await t.run("INSERT INTO sales (number, customer_id, subtotal, discount, total, note, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)", number, customerId, subtotal, discount, total, input.note || null, user.id)).lastInsertRowid,
+        (await t.run(
+          "INSERT INTO sales (number, customer_id, subtotal, discount, total, points_earned, points_redeemed, note, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          number,
+          customerId,
+          subtotal,
+          discount,
+          total,
+          pointsEarned,
+          pointsRedeemed,
+          input.note || null,
+          user.id,
+        )).lastInsertRowid,
       );
 
       // El cambio (vueltas) se descuenta del efectivo recibido.
@@ -173,6 +213,17 @@ export async function voidSale(fd: FormData) {
     }
     const credit = ((await t.get("SELECT SUM(amount) AS n FROM sale_payments WHERE sale_id = ? AND method = 'Saldo a favor'", id)) as { n: number | null }).n ?? 0;
     if (credit && sale.customer_id) (await t.run("UPDATE customers SET store_credit = store_credit + ? WHERE id = ?", credit, sale.customer_id));
+    if (sale.customer_id) {
+      const salePts = (await t.get("SELECT points_earned, points_redeemed FROM sales WHERE id = ?", id)) as
+        | { points_earned: number; points_redeemed: number }
+        | undefined;
+      if (salePts?.points_earned) {
+        await t.run("UPDATE customers SET points = MAX(0, points - ?) WHERE id = ?", salePts.points_earned, sale.customer_id);
+      }
+      if (salePts?.points_redeemed) {
+        await t.run("UPDATE customers SET points = points + ? WHERE id = ?", salePts.points_redeemed, sale.customer_id);
+      }
+    }
     (await t.run("UPDATE sales SET status = 'anulada' WHERE id = ?", id));
   });
   revalidatePath(`/panel/ventas/${id}`);

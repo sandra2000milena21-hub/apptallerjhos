@@ -27,11 +27,23 @@ async function adjustCredit(fd: FormData) {
   revalidatePath(`/panel/clientes/${id}`);
 }
 
+async function adjustPoints(fd: FormData) {
+  "use server";
+  const user = await requireUser();
+  if (user.role !== "admin") return;
+  const id = parseInt(String(fd.get("id")), 10);
+  const sign = fd.get("op") === "restar" ? -1 : 1;
+  const pts = parseInt(String(fd.get("points") || "0").replace(/\D/g, ""), 10);
+  if (!pts) return;
+  await dbx.run("UPDATE customers SET points = MAX(COALESCE(points, 0) + ?, 0) WHERE id = ?", sign * pts, id);
+  revalidatePath(`/panel/clientes/${id}`);
+}
+
 export default async function ClientePage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   const id = parseInt((await params).id, 10);
   const c = (await dbx.get("SELECT * FROM customers WHERE id = ?", id)) as
-    | { id: number; name: string; doc_id: string | null; phone: string; email: string | null; notes: string | null; store_credit: number; created_at: string }
+    | { id: number; name: string; doc_id: string | null; phone: string; email: string | null; notes: string | null; store_credit: number; points?: number; created_at: string }
     | undefined;
   if (!c) notFound();
   const orders = (await dbx.all("SELECT id, number, model, device_type, status, created_at FROM orders WHERE customer_id = ? ORDER BY id DESC", id)) as {
@@ -118,6 +130,25 @@ export default async function ClientePage({ params }: { params: Promise<{ id: st
               <input name="amount" className="input !min-h-10" inputMode="numeric" placeholder="$" required />
               <button name="op" value="sumar" className="btn-ghost !min-h-10">+</button>
               <button name="op" value="restar" className="btn-ghost !min-h-10">−</button>
+            </form>
+          )}
+        </section>
+        <section className="card p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="section-title">Club de Puntos</p>
+            <span className="text-xl">⭐</span>
+          </div>
+          <div className="flex items-baseline justify-between">
+            <p className="text-3xl font-extrabold text-amber-400 tabular-nums">{(c.points ?? 0)} <span className="text-sm font-semibold text-slate-300">pts</span></p>
+            <p className="text-sm text-slate-400 font-semibold">{money((c.points ?? 0) * 20)}</p>
+          </div>
+          <p className="text-xs text-muted">1 punto por cada $1.000 COP pagados. Cada punto equivale a $20 COP de descuento.</p>
+          {user.role === "admin" && (
+            <form action={adjustPoints} className="flex gap-2 pt-1">
+              <input type="hidden" name="id" value={c.id} />
+              <input name="points" className="input !min-h-10" inputMode="numeric" placeholder="Puntos" required />
+              <button name="op" value="sumar" className="btn-ghost !min-h-10 font-bold" title="Sumar puntos">+</button>
+              <button name="op" value="restar" className="btn-ghost !min-h-10 font-bold" title="Restar puntos">−</button>
             </form>
           )}
         </section>

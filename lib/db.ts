@@ -17,7 +17,7 @@ function resolveDataDir(): string {
 
 export const DATA_DIR = resolveDataDir();
 export const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
-const SCHEMA_VERSION = "4";
+const SCHEMA_VERSION = "5";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS customers (
   phone TEXT NOT NULL,
   email TEXT,
   store_credit INTEGER NOT NULL DEFAULT 0,
+  points INTEGER NOT NULL DEFAULT 0,
   notes TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -203,6 +204,8 @@ CREATE TABLE IF NOT EXISTS sales (
   subtotal INTEGER NOT NULL DEFAULT 0,
   discount INTEGER NOT NULL DEFAULT 0,
   total INTEGER NOT NULL DEFAULT 0,
+  points_earned INTEGER NOT NULL DEFAULT 0,
+  points_redeemed INTEGER NOT NULL DEFAULT 0,
   status TEXT NOT NULL DEFAULT 'pagada',
   note TEXT,
   user_id INTEGER REFERENCES users(id),
@@ -303,12 +306,15 @@ const MIGRATIONS: [string, string, string][] = [
   ["orders", "device_id", "INTEGER"],
   ["orders", "priority", "TEXT NOT NULL DEFAULT 'normal'"],
   ["customers", "store_credit", "INTEGER NOT NULL DEFAULT 0"],
+  ["customers", "points", "INTEGER NOT NULL DEFAULT 0"],
   ["customers", "notes", "TEXT"],
   ["quote_items", "product_id", "INTEGER"],
   ["quote_items", "qty", "INTEGER NOT NULL DEFAULT 1"],
   ["quote_items", "unit_cost", "INTEGER NOT NULL DEFAULT 0"],
   ["payments", "sale_id", "INTEGER"],
   ["payments", "external_ref", "TEXT"],
+  ["sales", "points_earned", "INTEGER NOT NULL DEFAULT 0"],
+  ["sales", "points_redeemed", "INTEGER NOT NULL DEFAULT 0"],
 ];
 
 const DEFAULT_SETTINGS: Record<string, string> = {
@@ -322,6 +328,9 @@ const DEFAULT_SETTINGS: Record<string, string> = {
   default_warranty_months: "3",
   default_diagnostic_fee: "0",
   storage_fee_per_day: "0",
+  loyalty_enabled: "1",
+  loyalty_pts_per_1000: "1",
+  loyalty_val_per_pt: "20",
   terms: DEFAULT_TERMS,
   sale_prefix: "V-",
   next_sale: "1",

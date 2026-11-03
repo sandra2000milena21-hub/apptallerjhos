@@ -12,8 +12,29 @@ export const metadata = { title: "Recibo de venta" };
 export default async function SalePage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   const id = parseInt((await params).id, 10);
-  const sale = (await dbx.get("SELECT s.*, c.name AS customer_name, c.phone AS customer_phone, u.name AS user_name FROM sales s LEFT JOIN customers c ON c.id = s.customer_id LEFT JOIN users u ON u.id = s.user_id WHERE s.id = ?", id)) as
-    | { id: number; number: string; subtotal: number; discount: number; total: number; status: string; created_at: string; customer_name: string | null; customer_phone: string | null; user_name: string }
+  const sale = (await dbx.get(
+    `SELECT s.*, c.name AS customer_name, c.phone AS customer_phone, c.points AS customer_points, u.name AS user_name 
+     FROM sales s 
+     LEFT JOIN customers c ON c.id = s.customer_id 
+     LEFT JOIN users u ON u.id = s.user_id 
+     WHERE s.id = ?`,
+    id,
+  )) as
+    | {
+        id: number;
+        number: string;
+        subtotal: number;
+        discount: number;
+        total: number;
+        points_earned: number;
+        points_redeemed: number;
+        status: string;
+        created_at: string;
+        customer_name: string | null;
+        customer_phone: string | null;
+        customer_points: number | null;
+        user_name: string;
+      }
     | undefined;
   if (!sale) notFound();
   const items = (await dbx.all("SELECT * FROM sale_items WHERE sale_id = ?", id)) as { id: number; description: string; qty: number; unit_price: number; order_id: number | null }[];
@@ -56,6 +77,36 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
           <p className="flex justify-between font-bold text-base"><span>Total</span><span>{money(sale.total)}</span></p>
           {pays.map((p, i) => <p key={i} className="flex justify-between"><span>{p.method}</span><span>{money(p.amount)}</span></p>)}
         </div>
+
+        {/* Bloque Club de Puntos y Fidelización en Ticket */}
+        {sale.customer_name && (sale.points_earned > 0 || sale.points_redeemed > 0 || (sale.customer_points ?? 0) > 0) && (
+          <div className="border-t border-dashed border-slate-400 mt-2.5 pt-2 text-center space-y-1">
+            <p className="font-bold text-[11px] uppercase tracking-wider text-slate-800">⭐ CLUB DE PUNTOS ⭐</p>
+            <div className="bg-slate-100 rounded-lg p-2 text-left space-y-0.5 border border-slate-300">
+              {sale.points_earned > 0 && (
+                <p className="flex justify-between font-bold text-emerald-800">
+                  <span>Puntos ganados hoy:</span>
+                  <span>+{sale.points_earned} pts</span>
+                </p>
+              )}
+              {sale.points_redeemed > 0 && (
+                <p className="flex justify-between text-slate-600">
+                  <span>Puntos redimidos:</span>
+                  <span className="font-semibold">-{sale.points_redeemed} pts</span>
+                </p>
+              )}
+              <p className="flex justify-between font-black text-slate-950 border-t border-slate-300 pt-1 text-[13px]">
+                <span>Saldo disponible:</span>
+                <span>{sale.customer_points ?? 0} pts</span>
+              </p>
+              <p className="text-[11px] text-slate-600 text-center pt-0.5 font-medium">
+                Equivalente a {money((sale.customer_points ?? 0) * 20)} para tu próximo servicio
+              </p>
+            </div>
+            <p className="text-[10px] text-slate-600 italic">¡Acumula y redime en reparaciones y accesorios!</p>
+          </div>
+        )}
+
         <p className="text-center mt-3 text-[11px] text-slate-500">Documento interno, no es factura electrónica. ¡Gracias por tu compra!</p>
       </div>
     </div>

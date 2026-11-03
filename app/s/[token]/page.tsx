@@ -27,6 +27,10 @@ export default async function ClientTracking({ params }: { params: Promise<{ tok
   const t = await totals(o.id, o);
   const services = parseJSON<string[]>(o.services, []).map((k) => serviceLabel(o.device_type, k));
   const info = statusInfo(o.status);
+  const cust = (await (await import("@/lib/db")).dbx.get("SELECT COALESCE(points, 0) AS points FROM customers WHERE id = ?", o.customer_id)) as
+    | { points: number }
+    | undefined;
+  const points = cust?.points ?? 0;
 
   // El paso "Esperando repuesto" se muestra como parte de "Reparación".
   const effective = o.status === "esperando_repuesto" ? "en_reparacion" : o.status;
@@ -47,6 +51,18 @@ export default async function ClientTracking({ params }: { params: Promise<{ tok
         {o.status === "esperando_repuesto" && <p className="mt-1 text-warn font-semibold">Estamos esperando el repuesto.</p>}
         {o.due_date && !["listo", "entregado"].includes(o.status) && (
           <p className="text-[15px] mt-2">Entrega estimada: <b className="text-white">{dateOnly(o.due_date)}</b></p>
+        )}
+        {points > 0 && (
+          <div className="mt-3 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-base">⭐</span>
+              <div>
+                <p className="font-bold text-amber-300">Club de Puntos</p>
+                <p className="text-slate-300">Tienes {points} puntos acumulados ({money(points * 20)})</p>
+              </div>
+            </div>
+            <span className="chip bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">Redimibles</span>
+          </div>
         )}
         {o.priority === "urgente" && (
           <div className="mt-3 p-3 rounded-2xl bg-pink-500/15 border border-pink-500/30 text-pink-200 text-xs flex items-center gap-2">
