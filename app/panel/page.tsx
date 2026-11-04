@@ -126,7 +126,14 @@ export default async function Tablero({ searchParams }: { searchParams: Promise<
       )}
 
       {/* Burbuja Asistente de Taller y Recordatorios Diarios */}
-      <DailyAssistantBubble cards={cards} lowStock={k.lowStock} appointments={k.appointments} />
+      <DailyAssistantBubble
+        cards={cards}
+        lowStock={k.lowStock}
+        appointments={k.appointments}
+        incomeToday={k.income}
+        deliveredToday={k.delivered}
+        receivedToday={k.received}
+      />
     </div>
   );
 }

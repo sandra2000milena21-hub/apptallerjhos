@@ -227,6 +227,9 @@ select.input option {
 .sound-bar {
   animation: sound-wave-bar 0.8s ease-in-out infinite alternate;
 }
+.sound-bar:nth-child(1) {
+  animation-delay: 0.05s;
+}
 .sound-bar:nth-child(2) {
   animation-delay: 0.2s;
 }
@@ -235,6 +238,33 @@ select.input option {
 }
 .sound-bar:nth-child(4) {
   animation-delay: 0.15s;
+}
+.sound-bar:nth-child(5) {
+  animation-delay: 0.35s;
+}
+.sound-bar:nth-child(6) {
+  animation-delay: 0.1s;
+}
+.sound-bar:nth-child(7) {
+  animation-delay: 0.45s;
+}
+.sound-bar:nth-child(8) {
+  animation-delay: 0.25s;
+}
+.sound-bar:nth-child(9) {
+  animation-delay: 0.08s;
+}
+
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(6, 182, 212, 0.35), 0 0 30px rgba(99, 102, 241, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(6, 182, 212, 0.7), 0 0 45px rgba(99, 102, 241, 0.35);
+  }
+}
+.animate-glow-pulse {
+  animation: glow-pulse 2s ease-in-out infinite;
 }
 
 @media print {
