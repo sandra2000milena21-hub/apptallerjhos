@@ -1,10 +1,35 @@
-# Taller · Versión 4.0 (POS, Taller & Fidelización)
+# Taller · Versión 5.0 (IA Pro, Entrega Inteligente & Ultra Rendimiento)
 
 Sistema web para un local de reparación y venta de tecnología: celulares, tablets, computadores, consolas y relojes. Está pensado para usarse en un **iPad en el mostrador**, y el cliente sigue su reparación desde su celular.
 
 Toma como base **SpotsPOS** (Repair Spots), con lo mejor de **RepairDesk** y otras plataformas, adaptado a Colombia (Ley 1480 de 2011, Ley 1581 de 2012, WhatsApp, Wompi, pesos).
 
-## Novedades de la Versión 4.0
+## Novedades de la Versión 5.0
+
+- 🤖 **Asistente Personal IA de Máxima Fidelidad (Radar del Taller Pro)**:
+  - **Motor de voz neural**: Detección automática y selección prioritaria de voces naturales colombianas y latinoamericanas de alta fidelidad (Microsoft Salome, Microsoft Jorge, Google Español, Apple Mónica/Paulina/Siri).
+  - **3 Personalidades de voz**: *Jhos (Técnico Pro)* con tono masculino pausado y seguro, *Sofia (Coordinadora)* con voz ejecutiva clara, y *Jarvis IA* con alta velocidad y dinamismo.
+  - **Limpieza fonética humana**: Normaliza códigos de orden (*"orden número dos"*), monedas en pesos colombianos (*"ciento cincuenta mil pesos"*) y siglas técnicas (*"V I P"*).
+  - **Chaining secuencial sin cortes**: Elimina el corte de 15 segundos nativo de Safari/iPadOS al encadenar frases de forma fluida con respiración natural (120ms).
+  - **Ecualizador dinámico de 9 barras**: Espectro animado con halo neón cian/índigo que late al compás de la voz y subtítulos dinámicos en tiempo real.
+  - **Audio Engine por Web Audio API**: Acorde de inicio en Do Mayor 7 (C5-E5-G5-B5), chime de alerta doble tono y retroalimentación háptica sonora (100% nativo, cero latencia).
+  - **3 Modos de Briefing**: *30s Express* (directo a lo urgente), *Cobros y Entregas* (foco 100% comercial y dinero por recaudar), y *Completo* (saludo horario, ingresos, balance general y motivación).
+  - **Panel "Consultar a la IA"**: Botones de un toque para preguntarle al radar por dinero en espera, riesgo de corrosión en mojados, órdenes VIP y salud general del taller.
+- 📦 **Ventana de Proceso de Entrega y Cobro Unificado (`DeliveryModal`)**:
+  - Saldo restante en tiempo real y selector de método de pago: **💵 Efectivo**, **📲 Transferencia (Nequi / Bancolombia / Daviplata)** o **💳 Tarjeta**.
+  - Permite cobrar el saldo exacto o abono parcial, acreditando de inmediato los puntos al cliente.
+  - Campo para **nota final de reparación y garantía** con selector de visibilidad para el cliente.
+  - Nombre de quien retira y **firma digital en pantalla** (dedo o Apple Pencil).
+  - Emisión instantánea de recibo de caja y botón directo para **imprimir ticket térmico de 80 mm**.
+  - Integrado en el tablero (botón directo en tarjeta y botón expandido) y dentro del propio radar del asistente.
+- ⚡ **Optimización Integral de Base de Datos y Caché**:
+  - **PRAGMAs SQLite Enterprise**: `journal_mode = WAL`, `synchronous = NORMAL`, `cache_size = -64000` (64 MB de caché en RAM), `temp_store = MEMORY` y `mmap_size = 256 MB` de I/O mapeado en memoria.
+  - **Índices de alto rendimiento**: Índices dedicados para `customers(points)`, `orders(status)`, `orders(priority)`, `orders(due_date)`, `sales(points_earned, points_redeemed)` y `sales(user_id)`.
+  - **Turbo-Cache HTTP**: Compresión Brotli/Gzip activada, cabeceras `immutable` de 1 año para assets estáticos y caché optimizada para imágenes/archivos adjuntos.
+- ⭐ **Club de Puntos y Fidelización (v4.0 integrado)**:
+  - 1 punto por cada \$1.000 COP pagados en reparaciones y ventas.
+  - Redención directa en caja con 1 toque (\$20 COP por punto).
+  - Desglose en ticket térmico de 80 mm y portal del cliente.
 
 - ⭐ **Sistema de Fidelización y Club de Puntos**: 
   - Acumulación automática: **1 punto por cada \$1.000 COP** pagados en reparaciones y productos.

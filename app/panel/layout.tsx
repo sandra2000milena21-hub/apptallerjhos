@@ -39,7 +39,7 @@ export default async function PanelLayout({ children }: { children: React.ReactN
                 {s.shop_name}
               </span>
               <span className="text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded-md bg-blue-500/20 text-blue-400 border border-blue-500/30">
-                v4.0
+                v5.0
               </span>
             </div>
           </Link>

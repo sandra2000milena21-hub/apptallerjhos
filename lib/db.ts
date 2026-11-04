@@ -17,7 +17,7 @@ function resolveDataDir(): string {
 
 export const DATA_DIR = resolveDataDir();
 export const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
-const SCHEMA_VERSION = "5";
+const SCHEMA_VERSION = "6";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS customers (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
+CREATE INDEX IF NOT EXISTS idx_customers_points ON customers(points);
 CREATE TABLE IF NOT EXISTS devices (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   customer_id INTEGER REFERENCES customers(id),
@@ -105,6 +106,8 @@ CREATE TABLE IF NOT EXISTS orders (
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer_id);
 CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at);
+CREATE INDEX IF NOT EXISTS idx_orders_priority ON orders(priority);
+CREATE INDEX IF NOT EXISTS idx_orders_due_date ON orders(due_date);
 CREATE TABLE IF NOT EXISTS quote_items (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
@@ -213,6 +216,8 @@ CREATE TABLE IF NOT EXISTS sales (
 );
 CREATE INDEX IF NOT EXISTS idx_sales_customer ON sales(customer_id);
 CREATE INDEX IF NOT EXISTS idx_sales_created ON sales(created_at);
+CREATE INDEX IF NOT EXISTS idx_sales_user ON sales(user_id);
+CREATE INDEX IF NOT EXISTS idx_sales_points ON sales(points_earned, points_redeemed);
 CREATE TABLE IF NOT EXISTS sale_items (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   sale_id INTEGER NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
@@ -409,9 +414,14 @@ async function connect(): Promise<Client> {
     const { createClient } = await import("@libsql/client");
     client = createClient({ url: "file:" + path.join(DATA_DIR, "taller.db") });
     await client.execute("PRAGMA journal_mode = WAL");
+    await client.execute("PRAGMA synchronous = NORMAL");
+    await client.execute("PRAGMA cache_size = -64000"); // 64 MB RAM cache
+    await client.execute("PRAGMA temp_store = MEMORY");
+    await client.execute("PRAGMA mmap_size = 268435456"); // 256 MB memory-mapped I/O
     await client.execute("PRAGMA busy_timeout = 5000");
   }
   await client.execute("PRAGMA foreign_keys = ON");
+  await client.execute("PRAGMA optimize").catch(() => {});
   await migrate(client);
   return client;
 }
