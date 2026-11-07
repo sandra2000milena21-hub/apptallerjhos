@@ -27,7 +27,7 @@ export const dynamic = "force-dynamic";
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es-CO">
-      <body className="min-h-dvh antialiased touch-manipulation selection:bg-blue-500/30 selection:text-white">
+      <body className="min-h-dvh antialiased selection:bg-blue-500/30 selection:text-white">
         {children}
       </body>
     </html>

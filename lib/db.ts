@@ -415,13 +415,11 @@ async function connect(): Promise<Client> {
     client = createClient({ url: "file:" + path.join(DATA_DIR, "taller.db") });
     await client.execute("PRAGMA journal_mode = WAL");
     await client.execute("PRAGMA synchronous = NORMAL");
-    await client.execute("PRAGMA cache_size = -64000"); // 64 MB RAM cache
+    await client.execute("PRAGMA cache_size = -8000"); // 8 MB cache
     await client.execute("PRAGMA temp_store = MEMORY");
-    await client.execute("PRAGMA mmap_size = 268435456"); // 256 MB memory-mapped I/O
     await client.execute("PRAGMA busy_timeout = 5000");
   }
   await client.execute("PRAGMA foreign_keys = ON");
-  await client.execute("PRAGMA optimize").catch(() => {});
   await migrate(client);
   return client;
 }

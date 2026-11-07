@@ -5,10 +5,16 @@ cls
 
 echo ====================================================
 echo           SISTEMA DE TALLER DE REPARACIONES
+echo                      TALLER JHOS
 echo ====================================================
 echo.
 echo Iniciando el servidor local...
-echo Modo 100%% Gratuito (Base de datos y fotos en este PC)
+echo.
+echo   - Desde este PC:  http://localhost:3000
+echo   - Desde tu iPad:   http://192.168.20.97:3000
+echo.
+echo Presiona Ctrl + C en esta ventana para detener.
+echo ====================================================
 echo.
 
 :: Abrir el navegador en 3 segundos

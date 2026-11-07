@@ -26,8 +26,15 @@ export default function SignaturePad({
     const rect = canvas.getBoundingClientRect();
     if (rect.width === 0) return;
 
-    canvas.width = Math.round(rect.width * ratio);
-    canvas.height = Math.round(height * ratio);
+    const targetW = Math.round(rect.width * ratio);
+    const targetH = Math.round(height * ratio);
+
+    if (canvas.width === targetW && canvas.height === targetH) {
+      return;
+    }
+
+    canvas.width = targetW;
+    canvas.height = targetH;
 
     if ("resetTransform" in ctx) {
       ctx.resetTransform();

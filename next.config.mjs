@@ -10,6 +10,7 @@ const nextConfig = {
   compress: true,
   poweredByHeader: false,
   reactStrictMode: true,
+  allowedDevOrigins: ["192.168.20.97", "192.168.20.97:3000", "localhost:3000"],
   experimental: {
     serverActions: { bodySizeLimit: "5mb" },
   },
