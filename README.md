@@ -1,10 +1,31 @@
-# Taller · Versión 5.0 (IA Pro, Entrega Inteligente & Ultra Rendimiento)
+# Taller Jhos · Versión 6.0 (Safari & iPadOS Enterprise Edition & Touch Drag & Drop)
 
-Sistema web para un local de reparación y venta de tecnología: celulares, tablets, computadores, consolas y relojes. Está pensado para usarse en un **iPad en el mostrador**, y el cliente sigue su reparación desde su celular.
+Sistema web para un local de reparación y venta de tecnología: celulares, tablets, computadores, consolas y relojes. Diseñado y optimizado al 100% para su uso en un **iPad en mostrador con Safari**, y para que el cliente consulte el estado de su orden desde su celular.
 
-Toma como base **SpotsPOS** (Repair Spots), con lo mejor de **RepairDesk** y otras plataformas, adaptado a Colombia (Ley 1480 de 2011, Ley 1581 de 2012, WhatsApp, Wompi, pesos).
+Toma como base **SpotsPOS** (Repair Spots), con lo mejor de **RepairDesk** y otras plataformas líderes, adaptado a Colombia (Ley 1480 de 2011, Ley 1581 de 2012, WhatsApp, Wompi, pesos).
 
-## Novedades de la Versión 5.0
+## Novedades de la Versión 6.0 (iPadOS & Safari Enterprise Edition)
+
+- ⚡ **Identidad de Marca Renovada**:
+  - Actualización oficial a la marca **Taller Jhos** en la barra superior junto al icono `⚡`, en la pantalla de inicio de sesión, en el radar del asistente y en todos los comprobantes.
+  - Soporte dinámico de configuración: el sistema adopta "Taller Jhos" de forma automática y preserva configuraciones personalizadas del local.
+
+- 🍎 **Optimización Integral para Safari e iPadOS (WebKit Engine)**:
+  - 👆 **Touch Drag & Drop en el Tablero Kanban**: En iPad y pantallas táctiles Safari no emitía eventos de arrastre HTML5 nativos; ahora cuenta con detección táctil fluida con el dedo o Apple Pencil (`onTouchStart`, `onTouchMove`, `onTouchEnd`), resaltado luminoso de columna receptora y sujeción instantánea.
+  - ✍️ **Firma Digital Blindada para Apple Pencil y Dedos**:
+    - Adaptación por `ResizeObserver`: el lienzo calcula sus dimensiones exactas aun dentro de modales con animaciones de entrada.
+    - Redibujado automático al rotar el iPad (de horizontal a vertical o viceversa) sin perder los trazos de la firma.
+    - Prevención de desplazamiento involuntario de página (`touchmove { passive: false }`) mientras se firma.
+    - Captura de puntero segura contra excepciones de Safari (`InvalidPointerId`).
+  - 🎙️ **Solución al Bloqueo de Voz y Audio en Safari iOS**:
+    - Persistencia global de locuciones contra el recolector de basura (GC) de WebKit, eliminando el corte abrupto tras 15 segundos.
+    - Desbloqueo síncrono del Web Audio API (`audioFx.unlock()`) en cada interacción táctil directa.
+  - 🔍 **Eliminación del Zoom Forzado de Safari**: Tamaño de fuente mínimo de 16px en todos los campos de entrada de datos en tabletas y móviles, evitando que Safari acerque bruscamente la pantalla al tocar un campo.
+  - 📱 **Soporte de Áreas Seguras (Safe Area Insets)**: Cabecera con `env(safe-area-inset-top)` y `viewport-fit=cover` para aprovechar al máximo las pantallas de iPad con bordes curvos o Dynamic Island.
+  - 📋 **Portapapeles Universal**: Enlace de seguimiento con fallback por área de texto para iPads donde la API `navigator.clipboard` esté restringida.
+  - 🔒 **Bloqueo de Fondo en Modales**: Elimina el arrastre del fondo cuando se interactúa con el modal de entrega o el radar del asistente.
+
+## Novedades de la Versión 5.0 (IA Pro, Entrega Inteligente & Ultra Rendimiento)
 
 - 🤖 **Asistente Personal IA de Máxima Fidelidad (Radar del Taller Pro)**:
   - **Motor de voz neural**: Detección automática y selección prioritaria de voces naturales colombianas y latinoamericanas de alta fidelidad (Microsoft Salome, Microsoft Jorge, Google Español, Apple Mónica/Paulina/Siri).

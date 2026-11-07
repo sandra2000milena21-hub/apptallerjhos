@@ -39,6 +39,15 @@ export default function DeliveryModal({
   const [successResult, setSuccessResult] = useState<{ saleId?: number } | null>(null);
   const [pending, startTransition] = useTransition();
 
+  // Bloquear scroll de fondo en iPad / Safari mientras el modal esté abierto
+  useEffect(() => {
+    const orig = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = orig;
+    };
+  }, []);
+
   useEffect(() => {
     let active = true;
     getOrderDeliveryInfo(orderId).then((res) => {
@@ -284,7 +293,7 @@ export default function DeliveryModal({
                 value={finalNote}
                 onChange={(e) => setFinalNote(e.target.value)}
                 placeholder="Ej. Se probó táctil, cámaras y audio a satisfacción con el cliente. Garantía de 3 meses por sello."
-                className="input !text-xs !min-h-16 resize-none"
+                className="input text-base sm:text-xs !min-h-16 resize-none"
               />
             </div>
 
@@ -292,7 +301,7 @@ export default function DeliveryModal({
             <div className="space-y-1">
               <label className="text-xs font-bold text-slate-300">Nombre de quien retira el equipo</label>
               <input
-                className="input !min-h-10 text-xs font-medium"
+                className="input !min-h-11 text-base sm:text-xs font-medium"
                 value={deliveredTo}
                 onChange={(e) => setDeliveredTo(e.target.value)}
                 placeholder="Nombre del cliente o persona autorizada"

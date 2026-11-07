@@ -34,7 +34,7 @@ export default function TermsAudioPlayer({ text }: { text: string }) {
     window.speechSynthesis.cancel();
 
     // Texto adaptado para lectura auditiva fluida y comprensible en español
-    const speechText = `A continuación escuchará las condiciones legales del servicio de nuestro taller. ${text
+    const speechText = `A continuación escuchará las condiciones legales del servicio de Taller Jhos. ${text
       .replace(/(\d+)\.\s*/g, "Punto $1: ")
       .replace(/Ley 1480 de 2011/g, "Ley 1480 de 2011, Estatuto del Consumidor")
       .replace(/Ley 1581 de 2012/g, "Ley 1581 de 2012, Protección de Datos Personales")}`;
@@ -51,9 +51,26 @@ export default function TermsAudioPlayer({ text }: { text: string }) {
       voices.find((v) => v.lang.startsWith("es"));
     if (esVoice) utterance.voice = esVoice;
 
-    utterance.onend = () => setSpeaking(false);
-    utterance.onerror = () => setSpeaking(false);
+    if (typeof window !== "undefined") {
+      (window as unknown as { __termsUtterance?: SpeechSynthesisUtterance }).__termsUtterance = utterance;
+    }
 
+    utterance.onend = () => {
+      setSpeaking(false);
+      if (typeof window !== "undefined") {
+        delete (window as unknown as { __termsUtterance?: SpeechSynthesisUtterance }).__termsUtterance;
+      }
+    };
+    utterance.onerror = () => {
+      setSpeaking(false);
+      if (typeof window !== "undefined") {
+        delete (window as unknown as { __termsUtterance?: SpeechSynthesisUtterance }).__termsUtterance;
+      }
+    };
+
+    if (window.speechSynthesis.paused) {
+      window.speechSynthesis.resume();
+    }
     window.speechSynthesis.speak(utterance);
     setSpeaking(true);
   }

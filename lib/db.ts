@@ -17,7 +17,7 @@ function resolveDataDir(): string {
 
 export const DATA_DIR = resolveDataDir();
 export const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
-const SCHEMA_VERSION = "6";
+const SCHEMA_VERSION = "7";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -323,7 +323,7 @@ const MIGRATIONS: [string, string, string][] = [
 ];
 
 const DEFAULT_SETTINGS: Record<string, string> = {
-  shop_name: "Mi Taller",
+  shop_name: "Taller Jhos",
   shop_address: "Pereira, Risaralda",
   shop_phone: "",
   shop_whatsapp: "",

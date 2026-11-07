@@ -75,7 +75,7 @@ export default async function Tablero({ searchParams }: { searchParams: Promise<
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Taller en vivo</span>
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Taller Jhos en vivo</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">Tablero de Control</h1>
           <p className="text-sm text-slate-400 mt-0.5">{active} equipos activos · Arrastra las tarjetas entre columnas</p>

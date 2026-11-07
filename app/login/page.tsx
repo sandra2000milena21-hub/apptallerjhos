@@ -30,8 +30,8 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-400 flex items-center justify-center font-black text-white text-2xl shadow-lg shadow-blue-500/25 mb-3">
             ⚡
           </div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-white">{s.shop_name}</h1>
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Sistema de Gestión & Taller</p>
+          <h1 className="text-2xl font-extrabold tracking-tight text-white">{s.shop_name === "Mi Taller" || !s.shop_name ? "Taller Jhos" : s.shop_name}</h1>
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Sistema de Gestión · Taller Jhos</p>
         </div>
 
         {error && (

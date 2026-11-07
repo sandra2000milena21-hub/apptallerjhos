@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { STATUSES, statusInfo } from "@/lib/constants";
@@ -44,6 +44,8 @@ export default function Board({ cards }: { cards: BoardCard[] }) {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
   const [deliveryOrder, setDeliveryOrder] = useState<BoardCard | null>(null);
+  const touchStartRef = useRef<{ x: number; y: number; cardId: number } | null>(null);
+  const isTouchDraggingRef = useRef(false);
   const [, start] = useTransition();
 
   // Sincroniza cuando el servidor manda datos nuevos.
@@ -64,25 +66,52 @@ export default function Board({ cards }: { cards: BoardCard[] }) {
   }
 
   function toggleExpand(id: number) {
+    if (isTouchDraggingRef.current) return;
     setExpandedId((prev) => (prev === id ? null : id));
+  }
+
+  function fallbackCopy(text: string) {
+    try {
+      const el = document.createElement("textarea");
+      el.value = text;
+      el.style.position = "fixed";
+      el.style.left = "-9999px";
+      el.style.top = "0";
+      document.body.appendChild(el);
+      el.focus();
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+    } catch {
+      // Fallback seguro
+    }
   }
 
   function copyTrackingLink(token: string) {
     if (typeof window === "undefined") return;
     const url = `${window.location.origin}/s/${token}`;
-    navigator.clipboard.writeText(url);
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(url).catch(() => fallbackCopy(url));
+      } else {
+        fallbackCopy(url);
+      }
+    } catch {
+      fallbackCopy(url);
+    }
     setCopiedToken(token);
     setTimeout(() => setCopiedToken(null), 2500);
   }
 
   return (
     <>
-      <div className="flex gap-3.5 overflow-x-auto pb-4 -mx-4 px-4 snap-x overscroll-x-contain touch-pan-x transform-gpu">
+      <div className="flex gap-3.5 overflow-x-auto pb-4 -mx-4 px-4 snap-x overscroll-x-contain touch-pan-x transform-gpu scrollbar-none">
       {STATUSES.map((s) => {
         const col = local.filter((o) => o.status === s.key);
         return (
           <section
             key={s.key}
+            data-status-col={s.key}
             className="w-[280px] shrink-0 snap-start"
             onDragOver={(e) => {
               e.preventDefault();
@@ -126,7 +155,7 @@ export default function Board({ cards }: { cards: BoardCard[] }) {
             <div
               className={`space-y-3 min-h-36 rounded-2xl p-2.5 transition border ${
                 over === s.key
-                  ? "bg-blue-600/15 border-blue-500/50 ring-2 ring-blue-500/30"
+                  ? "bg-blue-600/20 border-blue-400/80 ring-2 ring-blue-400/40 shadow-lg shadow-blue-950/50"
                   : "bg-[#0d1626]/70 border-white/[0.05]"
               }`}
             >
@@ -136,6 +165,46 @@ export default function Board({ cards }: { cards: BoardCard[] }) {
                   <div
                     key={o.id}
                     draggable
+                    onTouchStart={(e) => {
+                      const t = e.touches[0];
+                      touchStartRef.current = { x: t.clientX, y: t.clientY, cardId: o.id };
+                      isTouchDraggingRef.current = false;
+                    }}
+                    onTouchMove={(e) => {
+                      if (!touchStartRef.current) return;
+                      const t = e.touches[0];
+                      const dx = Math.abs(t.clientX - touchStartRef.current.x);
+                      const dy = Math.abs(t.clientY - touchStartRef.current.y);
+                      if (dx > 12 || dy > 12) {
+                        isTouchDraggingRef.current = true;
+                        setDragging(touchStartRef.current.cardId);
+                        const el = document.elementFromPoint(t.clientX, t.clientY);
+                        const targetCol = el?.closest("[data-status-col]")?.getAttribute("data-status-col");
+                        if (targetCol && targetCol !== over) {
+                          setOver(targetCol);
+                        }
+                      }
+                    }}
+                    onTouchEnd={() => {
+                      if (touchStartRef.current && isTouchDraggingRef.current) {
+                        const cardId = touchStartRef.current.cardId;
+                        if (over && over !== o.status) {
+                          if (over === "entregado") {
+                            const card = local.find((c) => c.id === cardId);
+                            if (card) setDeliveryOrder(card);
+                            else move(cardId, "entregado");
+                          } else {
+                            move(cardId, over);
+                          }
+                        }
+                      }
+                      touchStartRef.current = null;
+                      setTimeout(() => {
+                        isTouchDraggingRef.current = false;
+                      }, 50);
+                      setDragging(null);
+                      setOver(null);
+                    }}
                     onDragStart={(e) => {
                       e.dataTransfer.effectAllowed = "move";
                       e.dataTransfer.setData("text/plain", String(o.id));
@@ -149,7 +218,7 @@ export default function Board({ cards }: { cards: BoardCard[] }) {
                       isExpanded
                         ? "border-blue-500/60 ring-2 ring-blue-500/30 shadow-xl shadow-blue-950/40"
                         : "border-white/[0.08] hover:border-blue-500/35"
-                    } ${dragging === o.id ? "opacity-30 scale-95" : ""} ${
+                    } ${dragging === o.id ? "opacity-35 scale-[0.98] ring-2 ring-blue-400" : ""} ${
                       o.priority === "urgente"
                         ? "border-l-4 border-l-rose-500 shadow-rose-950/20"
                         : o.priority === "alta"

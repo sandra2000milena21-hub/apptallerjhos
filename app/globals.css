@@ -27,6 +27,13 @@
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", "Segoe UI", Roboto, sans-serif;
 }
 
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+}
+
 html {
   -webkit-text-size-adjust: 100%;
   color-scheme: dark;
@@ -41,6 +48,8 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
   min-height: 100dvh;
   position: relative;
   overflow-x: hidden;
@@ -265,6 +274,56 @@ select.input option {
 }
 .animate-glow-pulse {
   animation: glow-pulse 2s ease-in-out infinite;
+}
+
+/* =========================================================================
+   OPTIMIZACIONES SAFARI & IPADOS (WebKit Enterprise Engine)
+   ========================================================================= */
+
+/* Previene el zoom forzado automático de Safari en iPad e iPhone en inputs */
+@media (max-width: 1024px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Soporte WebKit para efecto vidrio en Safari iOS */
+.backdrop-blur-md {
+  -webkit-backdrop-filter: blur(12px);
+}
+.backdrop-blur-xl {
+  -webkit-backdrop-filter: blur(24px);
+}
+.backdrop-blur-sm {
+  -webkit-backdrop-filter: blur(4px);
+}
+.backdrop-blur-xs {
+  -webkit-backdrop-filter: blur(2px);
+}
+
+/* Ocultar barra de scroll en WebKit y navegadores modernos */
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* Optimización de gestos táctiles y drag en iPad */
+[draggable="true"] {
+  -webkit-user-drag: element;
+  -webkit-touch-callout: none;
+}
+
+.touch-pan-x {
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
+}
+
+.touch-pan-y {
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
 }
 
 @media print {

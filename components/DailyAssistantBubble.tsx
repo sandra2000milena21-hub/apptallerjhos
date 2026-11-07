@@ -30,11 +30,23 @@ class CyberAudioEngine {
         if (AudioCtx) this.ctx = new AudioCtx();
       }
       if (this.ctx && this.ctx.state === "suspended") {
-        this.ctx.resume();
+        this.ctx.resume().catch(() => {});
       }
       return this.ctx;
     } catch {
       return null;
+    }
+  }
+
+  // Desbloqueo síncrono para Safari / WebKit iOS
+  unlock() {
+    try {
+      const ctx = this.getContext();
+      if (ctx && ctx.state === "suspended") {
+        ctx.resume().catch(() => {});
+      }
+    } catch {
+      // Ignorar
     }
   }
 
@@ -260,6 +272,17 @@ export default function DailyAssistantBubble({
     };
   }, []);
 
+  // Prevenir desplazamiento del fondo en iPad cuando el modal HUD está abierto
+  useEffect(() => {
+    if (open) {
+      const orig = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = orig;
+      };
+    }
+  }, [open]);
+
   // Animación wiggle periódica para llamar la atención sutilmente
   useEffect(() => {
     const timer = setInterval(() => {
@@ -315,10 +338,10 @@ export default function DailyAssistantBubble({
     const hour = new Date().getHours();
     const greeting =
       hour < 12
-        ? "¡Buenos días Jhos y equipo del taller!"
+        ? "¡Buenos días Jhos y equipo de Taller Jhos!"
         : hour < 18
-        ? "¡Buenas tardes Jhos! Este es el radar de tu taller."
-        : "¡Buenas noches Jhos! Resumen de cierre de jornada.";
+        ? "¡Buenas tardes Jhos! Este es el radar de Taller Jhos."
+        : "¡Buenas noches Jhos! Resumen de cierre de jornada de Taller Jhos.";
 
     const sentences: string[] = [greeting];
 
@@ -348,7 +371,7 @@ export default function DailyAssistantBubble({
       if (urgentCards.length === 0 && wetCards.length === 0 && readyCards.length === 0) {
         sentences.push(`Tienes ${cards.length} órdenes activas y el flujo está totalmente al día.`);
       }
-      sentences.push("¡Muchos éxitos hoy en el taller!");
+      sentences.push("¡Muchos éxitos hoy en Taller Jhos!");
       return sentences;
     }
 
@@ -453,6 +476,9 @@ export default function DailyAssistantBubble({
 
     // Cancelar cualquier audio anterior
     window.speechSynthesis.cancel();
+    if (typeof window !== "undefined") {
+      (window as unknown as { __activeUtterances?: SpeechSynthesisUtterance[] }).__activeUtterances = [];
+    }
     isPlayingRef.current = false;
     sentenceQueueRef.current = rawSentences.map((s) => cleanSpeechText(s)).filter(Boolean);
 
@@ -464,6 +490,7 @@ export default function DailyAssistantBubble({
 
     isPlayingRef.current = true;
     setSpeaking(true);
+    audioFx.unlock();
     audioFx.playStartup();
 
     const voice = getBestVoice(voicePersona);
@@ -495,7 +522,15 @@ export default function DailyAssistantBubble({
         utterance.pitch = 1.0;
       }
 
+      // Prevención de Garbage Collection prematura en WebKit / Safari iOS
+      const activeList = (window as unknown as { __activeUtterances: SpeechSynthesisUtterance[] }).__activeUtterances;
+      if (activeList) activeList.push(utterance);
+
       utterance.onend = () => {
+        if (activeList) {
+          const idx = activeList.indexOf(utterance);
+          if (idx !== -1) activeList.splice(idx, 1);
+        }
         // Pausa natural de 120ms entre frases para respiración humana
         setTimeout(() => {
           speakNext();
@@ -503,9 +538,16 @@ export default function DailyAssistantBubble({
       };
 
       utterance.onerror = () => {
+        if (activeList) {
+          const idx = activeList.indexOf(utterance);
+          if (idx !== -1) activeList.splice(idx, 1);
+        }
         speakNext();
       };
 
+      if (window.speechSynthesis.paused) {
+        window.speechSynthesis.resume();
+      }
       window.speechSynthesis.speak(utterance);
     }
 
@@ -516,6 +558,7 @@ export default function DailyAssistantBubble({
   function stopSpeaking() {
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
+      (window as unknown as { __activeUtterances?: SpeechSynthesisUtterance[] }).__activeUtterances = [];
     }
     isPlayingRef.current = false;
     setSpeaking(false);
@@ -589,9 +632,9 @@ export default function DailyAssistantBubble({
         break;
       }
       case "salud": {
-        q = "¿Cuál es el diagnóstico de salud del taller?";
+        q = "¿Cuál es el diagnóstico de salud de Taller Jhos?";
         const total = cards.length;
-        a = `El taller cuenta con ${total} órdenes activas. ${
+        a = `Taller Jhos cuenta con ${total} órdenes activas. ${
           urgentCards.length === 0 && overdueCards.length === 0
             ? "El flujo de trabajo está impecable, sin vencimientos ni cuellos de botella."
             : `Tienes ${overdueCards.length} órdenes vencidas y ${urgentCards.length} urgentes que requieren atención hoy.`
@@ -605,6 +648,7 @@ export default function DailyAssistantBubble({
   }
 
   function handleToggleOpen() {
+    audioFx.unlock();
     const next = !open;
     setOpen(next);
     if (next) {
@@ -677,7 +721,7 @@ export default function DailyAssistantBubble({
             className={`relative w-15 h-15 rounded-full flex items-center justify-center bg-gradient-to-tr from-blue-700 via-indigo-600 to-cyan-500 text-white shadow-2xl shadow-blue-500/50 border-2 border-white/25 cursor-pointer transition-transform duration-300 active:scale-95 touch-manipulation transform-gpu ${
               wiggling ? "animate-cyber-wiggle" : "animate-cyber-float"
             }`}
-            aria-label="Abrir asistente de taller"
+            aria-label="Abrir asistente de Taller Jhos"
           >
             {speaking ? (
               // Ecualizador animado mientras habla
@@ -731,7 +775,7 @@ export default function DailyAssistantBubble({
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h2 className="text-lg font-black text-white tracking-tight">Radar del Taller</h2>
+                    <h2 className="text-lg font-black text-white tracking-tight">Radar Taller Jhos</h2>
                     <span className="px-2 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-[10px] font-bold text-cyan-300 uppercase tracking-wider">
                       Asistente Pro
                     </span>
@@ -783,7 +827,7 @@ export default function DailyAssistantBubble({
                   <p className="text-xs text-slate-300 truncate mt-0.5">
                     {speaking
                       ? "Toca detener para pausar la lectura"
-                      : "Escucha el estado del taller en segundos"}
+                      : "Escucha el estado de Taller Jhos en segundos"}
                   </p>
                 </div>
 
@@ -955,7 +999,7 @@ export default function DailyAssistantBubble({
                                   ""
                                 )}?text=¡Hola%20${encodeURIComponent(
                                   c.customer
-                                )}!%20Te%20saludamos%20de%20tu%20taller.%20Tu%20equipo%20${encodeURIComponent(
+                                )}!%20Te%20saludamos%20de%20Taller%20Jhos.%20Tu%20equipo%20${encodeURIComponent(
                                   c.model
                                 )}%20(Orden%20${c.number})%20ya%20está%20listo%20para%20entrega.`}
                                 target="_blank"
@@ -1015,7 +1059,7 @@ export default function DailyAssistantBubble({
                                   ""
                                 )}?text=Hola%20${encodeURIComponent(
                                   c.customer
-                                )},%20te%20escribimos%20de%20tu%20taller%20sobre%20tu%20${encodeURIComponent(
+                                )},%20te%20escribimos%20de%20Taller%20Jhos%20sobre%20tu%20${encodeURIComponent(
                                   c.model
                                 )}%20(${c.number})`}
                                 target="_blank"
@@ -1101,7 +1145,7 @@ export default function DailyAssistantBubble({
                 {totalAlerts === 0 && readyCards.length === 0 && (
                   <div className="p-6 text-center rounded-2xl bg-white/[0.03] border border-white/[0.06]">
                     <span className="text-3xl">🎉</span>
-                    <p className="text-sm font-bold text-white mt-2">¡Todo al día en el taller!</p>
+                    <p className="text-sm font-bold text-white mt-2">¡Todo al día en Taller Jhos!</p>
                     <p className="text-xs text-slate-400 mt-1">
                       No tienes órdenes vencidas ni equipos con alertas críticas pendientes.
                     </p>
@@ -1175,7 +1219,7 @@ export default function DailyAssistantBubble({
                   >
                     <div className="flex items-center gap-2 text-xs font-bold text-cyan-300">
                       <span>📊</span>
-                      <span>¿Diagnóstico y salud general del taller?</span>
+                      <span>¿Diagnóstico y salud general de Taller Jhos?</span>
                     </div>
                     <p className="text-[11px] text-slate-400 mt-1">
                       Flujo de trabajo, cuellos de botella y balance general
@@ -1280,7 +1324,7 @@ export default function DailyAssistantBubble({
                     onClick={() => {
                       audioFx.playClick();
                       speakSentences([
-                        "Prueba de audio completada con éxito. Soy tu asistente personal de taller.",
+                        "Prueba de audio completada con éxito. Soy tu asistente personal de Taller Jhos.",
                       ]);
                     }}
                     className="px-3.5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs cursor-pointer shadow-md transition"

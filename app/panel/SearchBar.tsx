@@ -23,7 +23,7 @@ export default function SearchBar({ defaultValue }: { defaultValue?: string }) {
           name="q"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          className="input pl-10 pr-4 rounded-full min-h-11 text-sm bg-[#0e1828]/90 border-white/[0.12] focus:border-blue-400 text-white placeholder:text-slate-500 shadow-inner"
+          className="input pl-10 pr-4 rounded-full min-h-11 text-base sm:text-sm bg-[#0e1828]/90 border-white/[0.12] focus:border-blue-400 text-white placeholder:text-slate-500 shadow-inner"
           placeholder="Orden, cliente, IMEI o serial…"
           type="search"
         />
