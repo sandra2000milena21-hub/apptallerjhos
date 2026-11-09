@@ -10,7 +10,16 @@ const nextConfig = {
   compress: true,
   poweredByHeader: false,
   reactStrictMode: true,
-  allowedDevOrigins: ["192.168.20.97", "192.168.20.97:3000", "localhost:3000"],
+  allowedDevOrigins: [
+    "localhost:3000",
+    "127.0.0.1:3000",
+    "DESKTOP-EHAOJI9.local",
+    "DESKTOP-EHAOJI9.local:3000",
+    "192.168.20.97",
+    "192.168.20.97:3000",
+    "172.20.10.3",
+    "172.20.10.3:3000",
+  ],
   experimental: {
     serverActions: { bodySizeLimit: "5mb" },
   },

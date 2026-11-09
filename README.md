@@ -10,6 +10,12 @@ Toma como base **SpotsPOS** (Repair Spots), con lo mejor de **RepairDesk** y otr
   - Actualización oficial a la marca **Taller Jhos** en la barra superior junto al icono `⚡`, en la pantalla de inicio de sesión, en el radar del asistente y en todos los comprobantes.
   - Soporte dinámico de configuración: el sistema adopta "Taller Jhos" de forma automática y preserva configuraciones personalizadas del local.
 
+- 🚀 **Persistencia de Arranque e Inicio Automático con Windows**:
+  - **Inicio Automático en Windows**: Se incluye `iniciar-automatico.bat` registrado en `shell:startup` para encender el servidor en segundo plano cada vez que se prenda el PC.
+  - **Lanzador Inteligente (`iniciar.bat`)**: Si el servidor ya está corriendo, abre el navegador de inmediato sin reintentar ni generar conflicto de puertos (`EADDRINUSE`); si está apagado, libera el puerto y lo levanta.
+  - **Acceso mDNS Universal para iPad**: Además de la IP local dinámica (ej. `172.20.10.3:3000`), el iPad puede ingresar por `http://DESKTOP-EHAOJI9.local:3000` sin preocuparse por cambios de red Wi-Fi.
+  - **Scripts de Control**: `detener.bat`, `reiniciar.bat`, `instalar-inicio-automatico.bat` y `desinstalar-inicio-automatico.bat`.
+
 - 🍎 **Optimización Integral para Safari e iPadOS (WebKit Engine)**:
   - 👆 **Touch Drag & Drop en el Tablero Kanban**: En iPad y pantallas táctiles Safari no emitía eventos de arrastre HTML5 nativos; ahora cuenta con detección táctil fluida con el dedo o Apple Pencil (`onTouchStart`, `onTouchMove`, `onTouchEnd`), resaltado luminoso de columna receptora y sujeción instantánea.
   - ✍️ **Firma Digital Blindada para Apple Pencil y Dedos**:
