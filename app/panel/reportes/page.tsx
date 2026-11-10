@@ -1,6 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireUser } from "@/lib/auth";
+import { requireUser, requirePermission, hasPermission } from "@/lib/auth";
 import { dbx } from "@/lib/db";
 import { EXPENSE_CATEGORIES, PAYMENT_METHODS } from "@/lib/constants";
 import { dateTime, money, parseMoney } from "@/lib/format";
@@ -14,7 +14,7 @@ const L = (col: string) => `date(${col}, '-5 hours')`;
 async function addExpense(fd: FormData) {
   "use server";
   const user = await requireUser();
-  if (user.role === "tecnico") return;
+  if (!hasPermission(user, "reports_view")) return;
   const amount = parseMoney(fd.get("amount"));
   const description = String(fd.get("description") || "").trim();
   if (!amount || !description) return;
@@ -33,8 +33,7 @@ async function deleteExpense(fd: FormData) {
 type Row = { method: string; n: number };
 
 export default async function Reportes({ searchParams }: { searchParams: Promise<{ desde?: string; hasta?: string }> }) {
-  const user = await requireUser();
-  if (user.role === "tecnico") redirect("/panel");
+  const user = await requirePermission("reports_view");
   const sp = await searchParams;
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
   const from = sp.desde || today;

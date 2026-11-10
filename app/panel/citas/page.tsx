@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
-import { requireUser } from "@/lib/auth";
+import { requireUser, requirePermission } from "@/lib/auth";
 import { dbx } from "@/lib/db";
 import { DEVICE_TYPES, deviceType } from "@/lib/constants";
 import { dateOnly, whatsappLink } from "@/lib/format";
@@ -32,7 +32,7 @@ const STATUS: Record<string, string> = { pendiente: "bg-amber-100 text-amber-800
 const STATUS_LABEL: Record<string, string> = { pendiente: "Por confirmar", confirmada: "Confirmada", llego: "Llegó · orden creada", cancelada: "Cancelada" };
 
 export default async function Citas() {
-  await requireUser();
+  await requirePermission("appointments_view");
   const rows = (await dbx.all("SELECT * FROM appointments WHERE date >= date('now', '-5 hours', '-1 day') ORDER BY date, time")) as { id: number; name: string; phone: string; device_type: string; model: string | null; problem: string | null; date: string; time: string; status: string; source: string; order_id: number | null }[];
   const bookingUrl = `${await publicBaseUrl()}/agendar`;
   const byDate = new Map<string, typeof rows>();

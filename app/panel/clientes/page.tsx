@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { dbx } from "@/lib/db";
 import { money } from "@/lib/format";
 
 export const metadata = { title: "Clientes" };
 
 export default async function Clientes({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
-  await requireUser();
+  await requirePermission("customers_view");
   const { q } = await searchParams;
   const like = `%${(q ?? "").trim()}%`;
   const rows = (await dbx.all(`SELECT c.*, (SELECT COUNT(*) FROM orders o WHERE o.customer_id = c.id) AS orders,

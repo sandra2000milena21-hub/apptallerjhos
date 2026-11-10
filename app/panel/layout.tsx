@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireUser, logout } from "@/lib/auth";
+import { requireUser, logout, hasPermission } from "@/lib/auth";
 import { getSettings } from "@/lib/db";
 import { redirect } from "next/navigation";
 import NavLinks from "./NavLinks";
@@ -14,14 +14,14 @@ export default async function PanelLayout({ children }: { children: React.ReactN
   const user = await requireUser();
   const s = await getSettings();
   const links = [
-    { href: "/panel", label: "Tablero" },
-    { href: "/panel/caja", label: "Caja" },
-    { href: "/panel/inventario", label: "Inventario" },
-    { href: "/panel/clientes", label: "Clientes" },
-    { href: "/panel/retomas", label: "Retomas" },
-    { href: "/panel/citas", label: "Citas" },
-    ...(user.role !== "tecnico" ? [{ href: "/panel/reportes", label: "Reportes" }] : []),
-    ...(user.role === "admin" ? [{ href: "/panel/ajustes", label: "Ajustes" }] : []),
+    ...(hasPermission(user, "orders_view") ? [{ href: "/panel", label: "Tablero" }] : []),
+    ...(hasPermission(user, "caja_view") ? [{ href: "/panel/caja", label: "Caja" }] : []),
+    ...(hasPermission(user, "inventory_view") ? [{ href: "/panel/inventario", label: "Inventario" }] : []),
+    ...(hasPermission(user, "customers_view") ? [{ href: "/panel/clientes", label: "Clientes" }] : []),
+    ...(hasPermission(user, "buybacks_view") ? [{ href: "/panel/retomas", label: "Retomas" }] : []),
+    ...(hasPermission(user, "appointments_view") ? [{ href: "/panel/citas", label: "Citas" }] : []),
+    ...(hasPermission(user, "reports_view") ? [{ href: "/panel/reportes", label: "Reportes" }] : []),
+    ...(user.role === "admin" || hasPermission(user, "settings_view") ? [{ href: "/panel/ajustes", label: "Ajustes" }] : []),
   ];
 
   const initial = user.name.charAt(0).toUpperCase();
@@ -50,12 +50,14 @@ export default async function PanelLayout({ children }: { children: React.ReactN
           <NavLinks links={links} />
 
           <div className="ml-auto flex items-center gap-2.5 shrink-0">
-            <Link
-              href="/panel/nueva"
-              className="btn-accent rounded-full px-4 h-10 text-sm font-semibold flex items-center gap-1.5 shadow-md shadow-blue-600/30 hover:scale-105 transition"
-            >
-              <span className="text-base font-bold">+</span> Recepción
-            </Link>
+            {hasPermission(user, "orders_create") && (
+              <Link
+                href="/panel/nueva"
+                className="btn-accent rounded-full px-4 h-10 text-sm font-semibold flex items-center gap-1.5 shadow-md shadow-blue-600/30 hover:scale-105 transition"
+              >
+                <span className="text-base font-bold">+</span> Recepción
+              </Link>
+            )}
 
             <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-white/[0.08]">
               <div className="w-8 h-8 rounded-full bg-white/[0.08] border border-white/[0.12] flex items-center justify-center text-xs font-bold text-white" title={user.name}>

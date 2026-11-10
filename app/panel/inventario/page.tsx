@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireUser } from "@/lib/auth";
+import { requirePermission, hasPermission } from "@/lib/auth";
 import { searchProducts } from "@/lib/inventory";
 import { PRODUCT_KINDS } from "@/lib/constants";
 import ProductForm from "@/components/ProductForm";
@@ -10,13 +10,16 @@ import { saveProduct } from "./actions";
 export const metadata = { title: "Inventario" };
 
 export default async function Inventario({ searchParams }: { searchParams: Promise<{ q?: string; tipo?: string; bajo?: string; nuevo?: string; error?: string }> }) {
-  await requireUser();
+  const user = await requirePermission("inventory_view");
+  const canViewCosts = hasPermission(user, "view_costs");
+  const canEditInventory = hasPermission(user, "inventory_edit");
+
   const sp = await searchParams;
   const products = await searchProducts(sp.q ?? "", { kind: sp.tipo || undefined, lowOnly: sp.bajo === "1" });
   const value = products.filter((p) => p.track_stock).reduce((s, p) => s + Math.max(p.stock, 0) * p.cost, 0);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <h1 className="text-[28px] font-bold tracking-tight">Inventario</h1>
       <Tabs tabs={INVENTORY_TABS} active="productos" />
 
@@ -33,7 +36,9 @@ export default async function Inventario({ searchParams }: { searchParams: Promi
           <input type="checkbox" name="bajo" value="1" defaultChecked={sp.bajo === "1"} className="size-5" /> Solo stock bajo
         </label>
         <button className="btn-ghost">Filtrar</button>
-        <span className="ml-auto text-sm text-muted">Valor del inventario al costo: <b className="text-ink">{money(value)}</b></span>
+        {canViewCosts && (
+          <span className="ml-auto text-sm text-muted">Valor del inventario al costo: <b className="text-ink">{money(value)}</b></span>
+        )}
       </form>
 
       <div className="card overflow-x-auto">
@@ -42,14 +47,14 @@ export default async function Inventario({ searchParams }: { searchParams: Promi
             <tr>
               <th className="p-3 font-semibold">Producto</th>
               <th className="p-3 font-semibold">Tipo</th>
-              <th className="p-3 font-semibold text-right">Costo</th>
+              {canViewCosts && <th className="p-3 font-semibold text-right">Costo</th>}
               <th className="p-3 font-semibold text-right">Precio</th>
               <th className="p-3 font-semibold text-right">Stock</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
             {products.length === 0 && (
-              <tr><td colSpan={5} className="p-6 text-muted">No hay productos. Crea el primero abajo.</td></tr>
+              <tr><td colSpan={canViewCosts ? 5 : 4} className="p-6 text-muted">No hay productos. Crea el primero abajo.</td></tr>
             )}
             {products.map((p) => {
               const low = p.track_stock && p.stock <= p.min_stock;
@@ -60,7 +65,7 @@ export default async function Inventario({ searchParams }: { searchParams: Promi
                     <p className="text-xs text-muted font-mono">{[p.sku, p.barcode, p.imei].filter(Boolean).join(" · ")}{p.compatible ? ` · ${p.compatible}` : ""}</p>
                   </td>
                   <td className="p-3 text-sm">{PRODUCT_KINDS.find((k) => k.key === p.kind)?.label}{p.grade ? ` · Grado ${p.grade}` : ""}</td>
-                  <td className="p-3 text-right tabular-nums">{money(p.cost)}</td>
+                  {canViewCosts && <td className="p-3 text-right tabular-nums">{money(p.cost)}</td>}
                   <td className="p-3 text-right tabular-nums font-semibold">{money(p.price)}</td>
                   <td className="p-3 text-right tabular-nums">
                     {p.track_stock ? <span className={low ? "chip bg-warn-soft text-warn" : ""}>{p.stock}</span> : <span className="text-muted">—</span>}
@@ -72,11 +77,12 @@ export default async function Inventario({ searchParams }: { searchParams: Promi
         </table>
       </div>
 
-      <details className="card p-5" open={products.length === 0}>
-        <summary className="section-title cursor-pointer">+ Nuevo producto o repuesto</summary>
-        <ProductForm action={saveProduct} />
-      </details>
+      {canEditInventory && (
+        <details className="card p-5" open={products.length === 0}>
+          <summary className="section-title cursor-pointer">+ Nuevo producto o repuesto</summary>
+          <ProductForm action={saveProduct} />
+        </details>
+      )}
     </div>
   );
 }
-

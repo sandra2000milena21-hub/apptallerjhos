@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { dbx } from "@/lib/db";
 import { deviceType } from "@/lib/constants";
 import { dateOnly, money } from "@/lib/format";
@@ -7,7 +7,7 @@ import { dateOnly, money } from "@/lib/format";
 export const metadata = { title: "Retomas" };
 
 export default async function Retomas() {
-  await requireUser();
+  await requirePermission("buybacks_view");
   const rows = (await dbx.all(`SELECT b.*, c.name AS seller, p.stock AS in_stock FROM buybacks b JOIN customers c ON c.id = b.customer_id
        LEFT JOIN products p ON p.id = b.product_id ORDER BY b.id DESC LIMIT 200`,)) as { id: number; number: string; device_type: string; model: string; imei: string | null; grade: string; price: number; sale_price: number | null; payout: string; status: string; created_at: string; seller: string; in_stock: number | null }[];
   return (

@@ -3,6 +3,9 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { dbx } from "./db";
+import { parsePermissions, type UserPermissions } from "./permissions";
+
+export * from "./permissions";
 
 const COOKIE = "taller_sesion";
 const MAX_AGE = 60 * 60 * 24 * 14; // 14 días
@@ -15,16 +18,31 @@ function secret() {
   return new TextEncoder().encode(s);
 }
 
-export type SessionUser = { id: number; name: string; email: string; role: string };
+export type SessionUser = {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  phone?: string | null;
+  permissions: UserPermissions;
+};
 
-export async function login(email: string, password: string): Promise<boolean> {
-  const user = (await dbx.get("SELECT * FROM users WHERE email = ? AND active = 1", email.trim().toLowerCase())) as (SessionUser & { password_hash: string }) | undefined;
+export async function login(identifier: string, password: string): Promise<boolean> {
+  const clean = identifier.trim().toLowerCase();
+  const user = (await dbx.get(
+    "SELECT * FROM users WHERE (lower(email) = ? OR lower(name) = ?) AND active = 1",
+    clean,
+    clean,
+  )) as (SessionUser & { password_hash: string; permissions?: string | null }) | undefined;
+  
   if (!user || !bcrypt.compareSync(password, user.password_hash)) return false;
+  
   const token = await new SignJWT({ uid: user.id })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${MAX_AGE}s`)
     .sign(secret());
+    
   const isHttps = (process.env.PUBLIC_URL || "").startsWith("https") || process.env.VERCEL === "1";
   (await cookies()).set(COOKIE, token, {
     httpOnly: true,
@@ -45,8 +63,19 @@ export async function currentUser(): Promise<SessionUser | null> {
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, secret());
-    const user = (await dbx.get("SELECT id, name, email, role FROM users WHERE id = ? AND active = 1", payload.uid as number)) as SessionUser | undefined;
-    return user ?? null;
+    const rawUser = (await dbx.get(
+      "SELECT id, name, email, role, phone, permissions FROM users WHERE id = ? AND active = 1",
+      payload.uid as number,
+    )) as { id: number; name: string; email: string; role: string; phone?: string | null; permissions?: string | null } | undefined;
+    if (!rawUser) return null;
+    return {
+      id: rawUser.id,
+      name: rawUser.name,
+      email: rawUser.email,
+      role: rawUser.role,
+      phone: rawUser.phone ?? null,
+      permissions: parsePermissions(rawUser.permissions, rawUser.role),
+    };
   } catch {
     return null;
   }
@@ -61,5 +90,19 @@ export async function requireUser(): Promise<SessionUser> {
 export async function requireAdmin(): Promise<SessionUser> {
   const user = await requireUser();
   if (user.role !== "admin") redirect("/panel");
+  return user;
+}
+
+export function hasPermission(user: SessionUser | null | undefined, key: keyof UserPermissions): boolean {
+  if (!user) return false;
+  if (user.role === "admin") return true;
+  return Boolean(user.permissions?.[key]);
+}
+
+export async function requirePermission(key: keyof UserPermissions): Promise<SessionUser> {
+  const user = await requireUser();
+  if (!hasPermission(user, key)) {
+    redirect("/panel?error=denegado");
+  }
   return user;
 }

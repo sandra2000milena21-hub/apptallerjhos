@@ -17,7 +17,7 @@ function resolveDataDir(): string {
 
 export const DATA_DIR = resolveDataDir();
 export const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
-const SCHEMA_VERSION = "7";
+const SCHEMA_VERSION = "8";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -26,6 +26,8 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
   role TEXT NOT NULL DEFAULT 'asesor',
+  phone TEXT,
+  permissions TEXT,
   active INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -320,6 +322,8 @@ const MIGRATIONS: [string, string, string][] = [
   ["payments", "external_ref", "TEXT"],
   ["sales", "points_earned", "INTEGER NOT NULL DEFAULT 0"],
   ["sales", "points_redeemed", "INTEGER NOT NULL DEFAULT 0"],
+  ["users", "phone", "TEXT"],
+  ["users", "permissions", "TEXT"],
 ];
 
 const DEFAULT_SETTINGS: Record<string, string> = {

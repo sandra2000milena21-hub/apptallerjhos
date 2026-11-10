@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireUser } from "@/lib/auth";
+import { requireUser, hasPermission } from "@/lib/auth";
 import { dbx, tx } from "@/lib/db";
 import { addEvent, getOrder, nextNumber, totals } from "@/lib/orders";
 import { STATUS_KEYS, statusInfo, deviceType, PRIORITIES } from "@/lib/constants";
@@ -25,6 +25,7 @@ function refresh(id: number) {
 
 export async function changeStatus(fd: FormData) {
   const user = await requireUser();
+  if (!hasPermission(user, "orders_edit")) return;
   const id = idOf(fd);
   const status = String(fd.get("status"));
   if (!STATUS_KEYS.includes(status as never)) return;
@@ -79,7 +80,8 @@ export async function assignTechnician(fd: FormData) {
 }
 
 export async function addQuoteItem(fd: FormData) {
-  await requireUser();
+  const user = await requireUser();
+  if (!hasPermission(user, "orders_edit")) return;
   const id = idOf(fd);
   const description = String(fd.get("description") || "").trim();
   const amount = parseMoney(fd.get("amount"));
@@ -98,6 +100,7 @@ async function addItemWithPart(orderId: number, description: string, amount: num
 
 export async function addCatalogItem(fd: FormData) {
   const user = await requireUser();
+  if (!hasPermission(user, "orders_edit")) return;
   const id = idOf(fd);
   const c = (await dbx.get("SELECT * FROM repair_catalog WHERE id = ?", parseInt(String(fd.get("catalogId")), 10))) as
     | { id: number; name: string; price: number; product_id: number | null }
@@ -109,6 +112,7 @@ export async function addCatalogItem(fd: FormData) {
 
 export async function addProductItem(fd: FormData) {
   const user = await requireUser();
+  if (!hasPermission(user, "orders_edit")) return;
   const id = idOf(fd);
   const p = await getProduct(parseInt(String(fd.get("productId")), 10));
   if (!p) return;
@@ -119,6 +123,7 @@ export async function addProductItem(fd: FormData) {
 
 export async function removeQuoteItem(fd: FormData) {
   const user = await requireUser();
+  if (!hasPermission(user, "orders_edit")) return;
   const id = idOf(fd);
   const item = (await dbx.get("SELECT * FROM quote_items WHERE id = ? AND order_id = ?", parseInt(String(fd.get("itemId")), 10), id)) as
     | { id: number; product_id: number | null; qty: number }

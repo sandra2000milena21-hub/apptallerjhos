@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { dbx } from "@/lib/db";
 import { dateTime, money } from "@/lib/format";
 import POS from "./POS";
@@ -8,7 +8,7 @@ import { orderLineAction } from "./actions";
 export const metadata = { title: "Caja" };
 
 export default async function Caja({ searchParams }: { searchParams: Promise<{ orden?: string }> }) {
-  await requireUser();
+  await requirePermission("caja_view");
   const { orden } = await searchParams;
   const initialOrder = orden ? await orderLineAction(parseInt(orden, 10)) : null;
   const sales = (await dbx.all(`SELECT s.*, c.name AS customer_name FROM sales s LEFT JOIN customers c ON c.id = s.customer_id

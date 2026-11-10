@@ -1,9 +1,11 @@
 import { dbx, getSettings } from "@/lib/db";
+import { requirePermission } from "@/lib/auth";
 import Wizard from "./Wizard";
 
 export const metadata = { title: "Nueva recepción" };
 
 export default async function NuevaPage({ searchParams }: { searchParams: Promise<{ cita?: string }> }) {
+  await requirePermission("orders_create");
   const s = await getSettings();
   const { cita } = await searchParams;
   const appt = cita

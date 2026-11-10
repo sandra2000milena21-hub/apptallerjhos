@@ -1,12 +1,12 @@
-import bcrypt from "bcryptjs";
+import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
-import { dbx, getSettings, setSetting } from "@/lib/db";
+import { getSettings, setSetting } from "@/lib/db";
 import Tabs from "@/components/Tabs";
 import { SETTINGS_TABS } from "./tabs";
 
-export const metadata = { title: "Ajustes" };
+export const metadata = { title: "Ajustes · Local y Órdenes" };
 
 const FIELDS: { key: string; label: string; type?: string; hint?: string }[] = [
   { key: "shop_name", label: "Nombre del local" },
@@ -39,62 +39,35 @@ async function saveSettings(fd: FormData) {
   redirect("/panel/ajustes?ok=1");
 }
 
-async function addUser(fd: FormData) {
-  "use server";
-  await requireAdmin();
-  const name = String(fd.get("name") || "").trim();
-  const email = String(fd.get("email") || "").trim().toLowerCase();
-  const password = String(fd.get("password") || "");
-  const role = ["admin", "tecnico", "asesor"].includes(String(fd.get("role"))) ? String(fd.get("role")) : "asesor";
-  if (!name || !email || password.length < 6) redirect("/panel/ajustes?error=usuario");
-  try {
-    (await dbx.run("INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)", name, email, bcrypt.hashSync(password, 10), role));
-  } catch {
-    redirect("/panel/ajustes?error=existe");
-  }
-  revalidatePath("/panel/ajustes");
-}
-
-async function toggleUser(fd: FormData) {
-  "use server";
-  const me = await requireAdmin();
-  const id = parseInt(String(fd.get("id")), 10);
-  if (id === me.id) return;
-  (await dbx.run("UPDATE users SET active = 1 - active WHERE id = ?", id));
-  revalidatePath("/panel/ajustes");
-}
-
-async function resetPassword(fd: FormData) {
-  "use server";
-  await requireAdmin();
-  const id = parseInt(String(fd.get("id")), 10);
-  const password = String(fd.get("password") || "");
-  if (password.length < 6) redirect("/panel/ajustes?error=clave");
-  (await dbx.run("UPDATE users SET password_hash = ? WHERE id = ?", bcrypt.hashSync(password, 10), id));
-  redirect("/panel/ajustes?ok=clave");
-}
-
-const ROLE_LABEL: Record<string, string> = { admin: "Administrador", tecnico: "Técnico", asesor: "Asesor" };
-const ERRORS: Record<string, string> = {
-  usuario: "Completa nombre, correo y una contraseña de al menos 6 caracteres.",
-  existe: "Ya existe un usuario con ese correo.",
-  clave: "La contraseña debe tener al menos 6 caracteres.",
-};
-
 export default async function Ajustes({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string }> }) {
-  const me = await requireAdmin();
-  const { ok, error } = await searchParams;
+  await requireAdmin();
+  const { ok } = await searchParams;
   const s = await getSettings();
-  const users = (await dbx.all("SELECT id, name, email, role, active FROM users ORDER BY active DESC, name")) as {
-    id: number; name: string; email: string; role: string; active: number;
-  }[];
 
   return (
     <div className="max-w-4xl space-y-6">
       <h1 className="text-[28px] font-bold tracking-tight">Ajustes</h1>
       <Tabs tabs={SETTINGS_TABS} active="general" />
       {ok && <p className="rounded-xl bg-good-soft text-good font-semibold px-4 py-3">Cambios guardados.</p>}
-      {error && <p className="rounded-xl bg-bad-soft text-bad font-semibold px-4 py-3">{ERRORS[error] ?? "Error"}</p>}
+
+      <section className="card p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-gradient-to-r from-blue-950/40 via-indigo-950/20 to-slate-900 border border-blue-500/20 rounded-2xl shadow-lg">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">👥</span>
+            <h3 className="font-bold text-white text-lg">Perfiles, Empleados y Permisos</h3>
+          </div>
+          <p className="text-sm text-slate-300 max-w-xl">
+            Crea cuentas de acceso con usuario y contraseña para tus técnicos y asesores. Administra y modifica con precisión a qué datos tienen acceso y qué cambios pueden realizar en la base de datos principal.
+          </p>
+        </div>
+        <Link
+          href="/panel/ajustes/usuarios"
+          className="btn-primary shrink-0 flex items-center gap-2 px-5 py-2.5 shadow-md shadow-blue-500/25 hover:scale-[1.02] transition"
+        >
+          <span>Gestionar Usuarios y Permisos</span>
+          <span>→</span>
+        </Link>
+      </section>
 
       <form action={saveSettings} className="card p-5 space-y-4">
         <p className="section-title">Datos del local y de las órdenes</p>
@@ -117,42 +90,6 @@ export default async function Ajustes({ searchParams }: { searchParams: Promise<
         </div>
         <button className="btn-primary">Guardar ajustes</button>
       </form>
-
-      <section className="card p-5 space-y-4">
-        <p className="section-title">Usuarios</p>
-        <ul className="divide-y divide-line">
-          {users.map((u) => (
-            <li key={u.id} className="py-3 flex flex-wrap items-center gap-3">
-              <div className="flex-1 min-w-48">
-                <p className={`font-semibold ${u.active ? "" : "line-through text-muted"}`}>{u.name}</p>
-                <p className="text-sm text-muted">{u.email} · {ROLE_LABEL[u.role] ?? u.role}</p>
-              </div>
-              <form action={resetPassword} className="flex gap-2">
-                <input type="hidden" name="id" value={u.id} />
-                <input name="password" type="password" className="input !min-h-10 !w-40" placeholder="Nueva clave" autoComplete="new-password" />
-                <button className="btn-ghost !min-h-10">Cambiar</button>
-              </form>
-              {u.id !== me.id && (
-                <form action={toggleUser}>
-                  <input type="hidden" name="id" value={u.id} />
-                  <button className="btn-ghost !min-h-10">{u.active ? "Desactivar" : "Activar"}</button>
-                </form>
-              )}
-            </li>
-          ))}
-        </ul>
-        <form action={addUser} className="grid sm:grid-cols-[1fr_1fr_140px_150px_auto] gap-2">
-          <input name="name" className="input" placeholder="Nombre" required />
-          <input name="email" type="email" className="input" placeholder="Correo" required autoCapitalize="none" />
-          <input name="password" type="password" className="input" placeholder="Contraseña" required autoComplete="new-password" />
-          <select name="role" className="input" defaultValue="asesor">
-            <option value="asesor">Asesor</option>
-            <option value="tecnico">Técnico</option>
-            <option value="admin">Administrador</option>
-          </select>
-          <button className="btn-primary">Agregar</button>
-        </form>
-      </section>
     </div>
   );
 }
