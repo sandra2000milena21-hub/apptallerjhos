@@ -33,7 +33,7 @@ export default async function Catalogo() {
         </div>
         <div>
           <label className="label">Precio</label>
-          <input name="price" className="input" inputMode="numeric" placeholder="$" required />
+          <input name="price" type="number" step="any" min="0" className="input" inputMode="decimal" placeholder="$ 0.00" required />
         </div>
         <div>
           <label className="label">Repuesto que usa</label>

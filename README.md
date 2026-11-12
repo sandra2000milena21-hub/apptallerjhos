@@ -1,8 +1,31 @@
-# Taller Jhos · Versión 6.0 (Safari & iPadOS Enterprise Edition & Touch Drag & Drop)
+# Taller Jhos · Versión 7.0 (Excel Enterprise Edition & Decimal Precision Engine)
 
-Sistema web para un local de reparación y venta de tecnología: celulares, tablets, computadores, consolas y relojes. Diseñado y optimizado al 100% para su uso en un **iPad en mostrador con Safari**, y para que el cliente consulte el estado de su orden desde su celular.
+Sistema web integral para taller de servicio técnico, reparaciones y venta de tecnología: celulares, tablets, computadores, consolas y relojes. Diseñado y optimizado al 100% para su uso en un **iPad en mostrador con Safari**, computadores táctiles y de escritorio, y para que el cliente consulte el estado de su orden desde su celular.
 
-Toma como base **SpotsPOS** (Repair Spots), con lo mejor de **RepairDesk** y otras plataformas líderes, adaptado a Colombia (Ley 1480 de 2011, Ley 1581 de 2012, WhatsApp, Wompi, pesos).
+Toma como base **SpotsPOS** (Repair Spots), con lo mejor de **RepairDesk** y plataformas líderes, adaptado a Colombia (Ley 1480 de 2011, Ley 1581 de 2012, WhatsApp, Wompi, pesos).
+
+## Novedades de la Versión 7.0 (Excel Enterprise & Motor de Precisión Decimal)
+
+- 📊 **Nuevo Módulo de Exportación a Excel Profesional (.xlsx)** (`/panel/exportar`):
+  - **Exportación de Ingresos de Equipos**: Descarga de todos los registros históricos de equipos ingresados al taller o por período de tiempo (Hoy, Ayer, Esta Semana, Este Mes, Histórico Total o Rango Personalizado). Incluye cliente, documento/cédula, contacto, marca, modelo, IMEI/serial, falla reportada, costo de diagnóstico, cotización aprobada, pagos acumulados, saldo pendiente, fecha de entrega y técnico asignado.
+  - **Auditoría e Información Diaria de Caja**: Desglose financiero completo con todos los métodos de pago (Efectivo, Nequi, Daviplata, Tarjetas, Transferencias), ingresos, egresos operativos, pago de retomas y balance neto diario.
+  - **Libro Contable Multi-Hoja (ExcelJS)**:
+    - *Hoja 1: Resumen Diario y KPIs Ejecutivos*.
+    - *Hoja 2: Ingresos de Equipos (Registro Exhaustivo)*.
+    - *Hoja 3: Movimientos de Caja (Cronología de Transacciones)*.
+    - *Hoja 4: Ventas Mostrador (Facturación POS)*.
+  - **Diseño Estilizado**: Cabeceras ejecutivas navy blue, filas alternas (zebra striping), formatos automáticos de moneda (`$#,##0.00`), anchos auto-ajustados y fórmulas automáticas de totalización `SUM(...)`.
+  - **Descarga en 1 Clic**: Botón directo con streaming seguro y nombres de archivo organizados (`TallerJhos_full_today_YYYY-MM-DD.xlsx`).
+
+- 💵 **Corrección Integral y Blindaje de Decimales en Precios**:
+  - **Nuevo `parseMoney` Inteligente**: Corrige el error que multiplicaba por 100 precios con decimales (por ejemplo, `$15.50` ya no se convierte en `$1550`, sino en `$15.50` exacto). Soporta formatos mixtos con punto o coma decimal (`12.50`, `12,50`, `150.00`, `1.500.000`, `50.000`).
+  - **Visualización Dinámica con `money()`**: Muestra centavos/decimales cuando el precio los tiene (ej. `$15,50`), y mantiene formato entero limpio cuando no (ej. `$50.000`).
+  - **Entradas Desbloqueadas en Formularios**: Eliminación de bloqueos de teclado con `\D` en `ProductForm`, `Wizard` (recepción de orden), `POS` (caja), `BuybackForm` (retomas) y `PurchaseForm` (compras de inventario). Ahora se permite ingresar decimales de manera fluida y sin saltos de cursor.
+  - **Redondeo Numérico Seguro a 2 Decimales**: Prevención de inconsistencias de punto flotante de JavaScript en cotizaciones, balances, pagos y descuentos.
+
+- ⚡ **Optimizaciones de Rendimiento y Base de Datos**:
+  - Índices añadidos para acelerar consultas de entregas (`idx_orders_delivered`) y pagos vinculados a ventas (`idx_payments_sale`).
+  - Actualización de versión en cabecera global a `v7.0` y en `package.json` a `7.0.0`.
 
 ## Novedades de la Versión 6.0 (iPadOS & Safari Enterprise Edition)
 

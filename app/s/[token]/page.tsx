@@ -156,7 +156,7 @@ export default async function ClientTracking({ params }: { params: Promise<{ tok
                     ) : (
                       <a key={m.id} href={src} target="_blank" className="block aspect-square rounded-xl overflow-hidden bg-black/5">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={src} alt={cat.label} loading="lazy" className="w-full h-full object-cover" />
+                        <img src={`${src}&w=480`} alt={cat.label} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                       </a>
                     );
                   })}

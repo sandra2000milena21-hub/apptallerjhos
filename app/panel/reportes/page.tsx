@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser, requirePermission, hasPermission } from "@/lib/auth";
@@ -108,7 +109,25 @@ export default async function Reportes({ searchParams }: { searchParams: Promise
           </div>
           <button className="btn-ghost !min-h-10">Ver</button>
           <PrintButton />
+          <Link href="/panel/exportar" className="btn-primary !min-h-10 flex items-center gap-1.5 font-semibold text-sm">
+            <span>📊</span> Exportar Excel
+          </Link>
         </form>
+      </div>
+
+      <div className="no-print rounded-2xl bg-gradient-to-r from-blue-950/40 to-indigo-950/30 border border-blue-500/20 p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-300 flex items-center justify-center text-xl shrink-0">
+            📊
+          </div>
+          <div>
+            <p className="font-bold text-white text-sm">Módulo de Exportación a Excel (.xlsx) v7.0</p>
+            <p className="text-xs text-slate-400">Descarga todos los ingresos de equipos y la auditoría diaria con diseño contable y fórmulas automáticas.</p>
+          </div>
+        </div>
+        <Link href="/panel/exportar" className="btn-accent text-xs font-bold px-4 py-2 rounded-xl shrink-0 hover:scale-105 transition">
+          Abrir Exportador →
+        </Link>
       </div>
 
       <div className="grid sm:grid-cols-4 gap-3">
@@ -175,7 +194,7 @@ export default async function Reportes({ searchParams }: { searchParams: Promise
         <form action={addExpense} className="no-print grid sm:grid-cols-[1fr_180px_140px_150px_auto] gap-2">
           <input name="description" className="input" placeholder="Descripción" required />
           <select name="category" className="input">{EXPENSE_CATEGORIES.map((c) => <option key={c}>{c}</option>)}</select>
-          <input name="amount" className="input" inputMode="numeric" placeholder="$" required />
+          <input name="amount" type="number" step="any" min="0" className="input" inputMode="decimal" placeholder="$ 0.00" required />
           <select name="method" className="input">{["Efectivo", "Transferencia", "Tarjeta", "Nequi", "Daviplata"].map((m) => <option key={m}>{m}</option>)}</select>
           <button className="btn-primary">Registrar</button>
         </form>

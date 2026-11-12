@@ -100,7 +100,22 @@ export async function getOrderByToken(token: string): Promise<OrderWithCustomer 
   return (await dbx.get(`${ORDER_SELECT} WHERE o.token = ?`, token)) as OrderWithCustomer | undefined;
 }
 
-export async function listOrders(opts: { q?: string; includeDelivered?: boolean } = {}): Promise<OrderWithCustomer[]> {
+/** Solo las columnas que usan el tablero y la búsqueda (sin firmas, términos ni checklists). */
+export type BoardOrder = Pick<
+  Order,
+  | "id" | "number" | "token" | "status" | "device_type" | "priority" | "brand" | "model" | "imei" | "serial"
+  | "services" | "problem" | "diagnostic_fee" | "estimate" | "due_date" | "quote_status" | "created_at" | "ready_at"
+> & { customer_name: string; customer_phone: string };
+
+const BOARD_SELECT = `
+  SELECT o.id, o.number, o.token, o.status, o.device_type, o.priority, o.brand, o.model, o.imei, o.serial,
+         o.services, o.problem, o.diagnostic_fee, o.estimate, o.due_date, o.quote_status, o.created_at, o.ready_at,
+         c.name AS customer_name, c.phone AS customer_phone
+  FROM orders o
+  JOIN customers c ON c.id = o.customer_id
+`;
+
+export async function listOrders(opts: { q?: string; includeDelivered?: boolean } = {}): Promise<BoardOrder[]> {
   const where: string[] = [];
   const params: unknown[] = [];
   if (opts.q) {
@@ -110,9 +125,9 @@ export async function listOrders(opts: { q?: string; includeDelivered?: boolean 
   } else if (!opts.includeDelivered) {
     where.push("(o.status != 'entregado' OR o.delivered_at >= datetime('now', '-3 days'))");
   }
-  const sql = `${ORDER_SELECT} ${where.length ? "WHERE " + where.join(" AND ") : ""}
+  const sql = `${BOARD_SELECT} ${where.length ? "WHERE " + where.join(" AND ") : ""}
     ORDER BY CASE o.priority WHEN 'urgente' THEN 0 WHEN 'alta' THEN 1 ELSE 2 END, o.created_at DESC LIMIT 500`;
-  return (await dbx.all(sql, ...params)) as OrderWithCustomer[];
+  return (await dbx.all(sql, ...params)) as BoardOrder[];
 }
 
 export async function getMedia(orderId: number): Promise<Media[]> {
@@ -144,14 +159,16 @@ export async function getPayments(orderId: number, ex: Exec = dbx): Promise<Paym
 
 export async function totals(orderId: number, order: Pick<Order, "diagnostic_fee" | "estimate" | "quote_status">, ex: Exec = dbx) {
   const items = await getQuoteItems(orderId, ex);
-  const quoteTotal = items.reduce((s, i) => s + i.amount, 0);
-  const paid = (await getPayments(orderId, ex)).reduce((s, p) => s + p.amount, 0);
+  const quoteTotal = Math.round(items.reduce((s, i) => s + (i.amount || 0), 0) * 100) / 100;
+  const paid = Math.round((await getPayments(orderId, ex)).reduce((s, p) => s + (p.amount || 0), 0) * 100) / 100;
   // Si la cotización fue rechazada, solo se cobra el diagnóstico.
   let total: number;
   if (order.quote_status === "rechazada") total = order.diagnostic_fee;
   else if (items.length) total = quoteTotal;
   else total = order.estimate ?? order.diagnostic_fee;
-  return { items, quoteTotal, paid, total, balance: Math.max(total - paid, 0) };
+  total = Math.round((total || 0) * 100) / 100;
+  const balance = Math.max(0, Math.round((total - paid) * 100) / 100);
+  return { items, quoteTotal, paid, total, balance };
 }
 
 export async function addEvent(

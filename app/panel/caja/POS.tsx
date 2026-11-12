@@ -6,13 +6,14 @@ import { createSale, findCustomerByPhone, findOrderForCheckout, type SaleLine } 
 import { searchProductsAction } from "../inventario/actions";
 import ScanButton from "@/components/Scanner";
 import { PAYMENT_METHODS } from "@/lib/constants";
+import { money, parseMoney } from "@/lib/format";
 
 type OrderLineInfo = NonNullable<Awaited<ReturnType<typeof findOrderForCheckout>>>;
 type Customer = { id: number; name: string; phone: string; credit: number; points?: number };
 type Found = Awaited<ReturnType<typeof searchProductsAction>>[number];
 
-const fmt = (n: number) => "$" + Math.round(n).toLocaleString("es-CO");
-const num = (v: string) => parseInt(v.replace(/\D/g, "") || "0", 10);
+const fmt = (n: number) => money(n);
+const num = (v: string | number) => parseMoney(v);
 
 export default function POS({ initialOrder }: { initialOrder: OrderLineInfo | null }) {
   const router = useRouter();
@@ -192,13 +193,14 @@ export default function POS({ initialOrder }: { initialOrder: OrderLineInfo | nu
               <label className="label">Ítem libre</label>
               <div className="flex gap-2">
                 <input className="input" value={custom.description} onChange={(e) => setCustom({ ...custom, description: e.target.value })} placeholder="Descripción" />
-                <input className="input !w-28" inputMode="numeric" value={custom.price} onChange={(e) => setCustom({ ...custom, price: e.target.value })} placeholder="$" />
+                <input className="input !w-28" type="number" step="any" min="0" inputMode="decimal" value={custom.price} onChange={(e) => setCustom({ ...custom, price: e.target.value })} placeholder="$" />
                 <button
                   type="button"
                   className="btn-ghost"
                   onClick={() => {
-                    if (!custom.description || !num(custom.price)) return;
-                    setLines((l) => [...l, { type: "custom", description: custom.description, qty: 1, unitPrice: num(custom.price) }]);
+                    const pr = num(custom.price);
+                    if (!custom.description || !pr) return;
+                    setLines((l) => [...l, { type: "custom", description: custom.description, qty: 1, unitPrice: pr }]);
                     setCustom({ description: "", price: "" });
                   }}
                 >
@@ -229,7 +231,7 @@ export default function POS({ initialOrder }: { initialOrder: OrderLineInfo | nu
                       )}
                     </td>
                     <td className="p-2 w-36">
-                      <input className="input !min-h-10 text-right" inputMode="numeric" disabled={l.type === "order"} value={l.unitPrice.toLocaleString("es-CO")} onChange={(e) => setLines((x) => x.map((y, j) => (j === i ? { ...y, unitPrice: num(e.target.value) } as SaleLine : y)))} />
+                      <input className="input !min-h-10 text-right" type="number" step="any" min="0" inputMode="decimal" disabled={l.type === "order"} value={l.unitPrice} onChange={(e) => setLines((x) => x.map((y, j) => (j === i ? { ...y, unitPrice: num(e.target.value) } as SaleLine : y)))} />
                     </td>
                     <td className="p-3 text-right tabular-nums font-semibold w-32">{fmt(l.qty * l.unitPrice)}</td>
                     <td className="pr-2 w-8"><button type="button" className="text-muted hover:text-bad text-xl" onClick={() => setLines((x) => x.filter((_, j) => j !== i))}>×</button></td>
@@ -241,7 +243,7 @@ export default function POS({ initialOrder }: { initialOrder: OrderLineInfo | nu
         </div>
       </div>
 
-      <aside className="card p-4 space-y-4 lg:sticky lg:top-20">
+      <aside className="card p-4 space-y-4 lg:sticky lg:top-28 xl:top-20">
         <div>
           <label className="label">Cliente (opcional)</label>
           {customer ? (
@@ -319,7 +321,7 @@ export default function POS({ initialOrder }: { initialOrder: OrderLineInfo | nu
           <div className="flex justify-between"><dt className="text-muted">Subtotal</dt><dd className="tabular-nums">{fmt(subtotal)}</dd></div>
           <div className="flex justify-between items-center gap-3">
             <dt className="text-muted">Descuento</dt>
-            <dd><input className="input !min-h-9 !w-32 text-right" inputMode="numeric" value={discount ? discount.toLocaleString("es-CO") : ""} onChange={(e) => setDiscount(num(e.target.value))} placeholder="$0" /></dd>
+            <dd><input className="input !min-h-9 !w-32 text-right" type="number" step="any" min="0" inputMode="decimal" value={discount || ""} onChange={(e) => setDiscount(num(e.target.value))} placeholder="$0" /></dd>
           </div>
           <div className="flex justify-between text-2xl font-bold pt-1"><dt>Total</dt><dd className="tabular-nums">{fmt(total)}</dd></div>
         </dl>
@@ -332,7 +334,7 @@ export default function POS({ initialOrder }: { initialOrder: OrderLineInfo | nu
                 <select className="input !min-h-11" value={p.method} onChange={(e) => setPayments((ps) => ps.map((x, j) => (j === i ? { ...x, method: e.target.value } : x)))}>
                   {PAYMENT_METHODS.filter((m) => m !== "Wompi").map((m) => <option key={m}>{m}</option>)}
                 </select>
-                <input className="input !min-h-11 text-right" inputMode="numeric" value={p.amount ? p.amount.toLocaleString("es-CO") : ""} onChange={(e) => setPayments((ps) => ps.map((x, j) => (j === i ? { ...x, amount: num(e.target.value) } : x)))} placeholder={payments.length === 1 ? fmt(total) : "$0"} />
+                <input className="input !min-h-11 text-right" type="number" step="any" min="0" inputMode="decimal" value={p.amount || ""} onChange={(e) => setPayments((ps) => ps.map((x, j) => (j === i ? { ...x, amount: num(e.target.value) } : x)))} placeholder={payments.length === 1 ? fmt(total) : "$0"} />
                 <button type="button" className="btn-ghost !min-h-11 !px-2.5 text-sm" title="Completar con lo que falta" onClick={() => fillRemaining(i)}>Resto</button>
                 {payments.length > 1 && <button type="button" className="text-muted text-xl px-1" onClick={() => setPayments((ps) => ps.filter((_, j) => j !== i))}>×</button>}
               </div>

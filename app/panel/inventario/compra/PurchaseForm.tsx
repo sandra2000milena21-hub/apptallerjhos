@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { receivePurchase, searchProductsAction } from "../actions";
 import ScanButton from "@/components/Scanner";
+import { money, parseMoney } from "@/lib/format";
 
 type Line = { productId: number; name: string; qty: number; cost: number };
 type Found = Awaited<ReturnType<typeof searchProductsAction>>[number];
@@ -90,8 +91,8 @@ export default function PurchaseForm() {
               <tr key={l.productId}>
                 <td className="py-2">{l.name}</td>
                 <td><input className="input !min-h-10" type="number" min={1} value={l.qty} onChange={(e) => setLines((x) => x.map((y, j) => (j === i ? { ...y, qty: parseInt(e.target.value || "0", 10) } : y)))} /></td>
-                <td><input className="input !min-h-10" inputMode="numeric" value={l.cost} onChange={(e) => setLines((x) => x.map((y, j) => (j === i ? { ...y, cost: parseInt(e.target.value.replace(/\D/g, "") || "0", 10) } : y)))} /></td>
-                <td className="text-right tabular-nums">${(l.qty * l.cost).toLocaleString("es-CO")}</td>
+                <td><input className="input !min-h-10" type="number" step="any" min="0" inputMode="decimal" value={l.cost} onChange={(e) => setLines((x) => x.map((y, j) => (j === i ? { ...y, cost: parseMoney(e.target.value) } : y)))} /></td>
+                <td className="text-right tabular-nums">{money(l.qty * l.cost)}</td>
                 <td><button type="button" className="text-muted hover:text-bad text-lg px-2" onClick={() => setLines((x) => x.filter((_, j) => j !== i))}>×</button></td>
               </tr>
             ))}
@@ -99,7 +100,7 @@ export default function PurchaseForm() {
         </table>
       )}
       <div className="flex items-center justify-between gap-3">
-        <p className="font-bold">Total compra: ${total.toLocaleString("es-CO")}</p>
+        <p className="font-bold">Total compra: {money(total)}</p>
         <button
           className="btn-primary"
           disabled={pending || !lines.length}

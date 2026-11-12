@@ -85,13 +85,13 @@ export async function createSale(input: {
   const user = await requireUser();
   const lines = input.lines.filter((l) => l.qty > 0 && l.unitPrice >= 0);
   if (!lines.length) return { ok: false, error: "La venta no tiene productos." };
-  const subtotal = lines.reduce((s, l) => s + l.qty * l.unitPrice, 0);
-  const discount = Math.min(Math.max(0, Math.round(input.discount || 0)), subtotal);
-  const total = subtotal - discount;
+  const subtotal = Math.round(lines.reduce((s, l) => s + l.qty * l.unitPrice, 0) * 100) / 100;
+  const discount = Math.round(Math.min(Math.max(0, input.discount || 0), subtotal) * 100) / 100;
+  const total = Math.round((subtotal - discount) * 100) / 100;
   const payments = input.payments.filter((p) => p.amount > 0 && PAYMENT_METHODS.includes(p.method));
-  const paid = payments.reduce((s, p) => s + p.amount, 0);
+  const paid = Math.round(payments.reduce((s, p) => s + p.amount, 0) * 100) / 100;
   if (paid < total) return { ok: false, error: `Faltan $${(total - paid).toLocaleString("es-CO")} por pagar.` };
-  const nonCash = payments.filter((p) => p.method !== "Efectivo").reduce((s, p) => s + p.amount, 0);
+  const nonCash = Math.round(payments.filter((p) => p.method !== "Efectivo").reduce((s, p) => s + p.amount, 0) * 100) / 100;
   if (nonCash > total) {
     return { ok: false, error: "Los pagos electrónicos o con tarjeta no pueden ser mayores al total de la venta." };
   }

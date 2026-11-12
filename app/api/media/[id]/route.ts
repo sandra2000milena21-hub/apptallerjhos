@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import nodePath from "node:path";
 import { Readable } from "node:stream";
 import { NextRequest } from "next/server";
 import { currentUser } from "@/lib/auth";
@@ -30,15 +31,22 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
   let path: string;
   let stat: fs.Stats;
+  let mime = media.mime;
   try {
     path = mediaPath(media.filename);
+    // ?w=480 → miniatura liviana para las cuadrículas (la foto original solo se descarga al abrirla).
+    const thumb = await thumbnailFor(media, path, req.nextUrl.searchParams.get("w"));
+    if (thumb) {
+      path = thumb;
+      mime = "image/jpeg";
+    }
     stat = fs.statSync(path);
   } catch {
     return new Response("Archivo no encontrado", { status: 404 });
   }
 
   const baseHeaders: Record<string, string> = {
-    "Content-Type": media.mime,
+    "Content-Type": mime,
     "Accept-Ranges": "bytes",
     "Cache-Control": "private, max-age=86400",
     "X-Content-Type-Options": "nosniff",
@@ -74,6 +82,35 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   return new Response(Readable.toWeb(stream) as ReadableStream, {
     headers: { ...baseHeaders, "Content-Length": String(stat.size) },
   });
+}
+
+const THUMB_WIDTHS = [240, 480, 960];
+
+/**
+ * Genera (una sola vez) y guarda en data/uploads/.thumbs una versión reducida de la foto.
+ * Si algo falla (formato no soportado, sharp no disponible) devuelve null y se sirve el original.
+ */
+async function thumbnailFor(media: Media, original: string, w: string | null): Promise<string | null> {
+  if (!w || media.kind !== "photo" || !media.mime.startsWith("image/")) return null;
+  const width = THUMB_WIDTHS.find((x) => x >= (parseInt(w, 10) || 0)) ?? THUMB_WIDTHS[THUMB_WIDTHS.length - 1];
+  const dir = nodePath.join(nodePath.dirname(original), ".thumbs");
+  const out = nodePath.join(dir, `${media.id}_${width}.jpg`);
+  try {
+    await fs.promises.access(out);
+    return out;
+  } catch {
+    /* aún no existe: se crea abajo */
+  }
+  try {
+    const sharp = (await import("sharp")).default;
+    await fs.promises.mkdir(dir, { recursive: true });
+    const tmp = `${out}.${process.pid}.${Date.now()}.tmp`;
+    await sharp(original).rotate().resize({ width, withoutEnlargement: true }).jpeg({ quality: 72, mozjpeg: true }).toFile(tmp);
+    await fs.promises.rename(tmp, out);
+    return out;
+  } catch {
+    return null;
+  }
 }
 
 // Archivos en Vercel Blob privado: se leen con la clave del servidor y se reenvían, respetando los rangos para el video.

@@ -1,12 +1,69 @@
 export function money(n: number | null | undefined): string {
   if (n === null || n === undefined || Number.isNaN(n)) return "—";
-  return "$" + Math.round(n).toLocaleString("es-CO");
+  const abs = Math.abs(n);
+  const hasDecimals = abs % 1 !== 0 && Math.abs(Math.round(abs) - abs) > 0.001;
+  return "$" + n.toLocaleString("es-CO", {
+    minimumFractionDigits: hasDecimals ? 2 : 0,
+    maximumFractionDigits: 2,
+  });
 }
 
-export function parseMoney(v: FormDataEntryValue | string | null | undefined): number {
+export function parseMoney(v: FormDataEntryValue | string | number | null | undefined): number {
   if (v === null || v === undefined) return 0;
-  const digits = String(v).replace(/[^\d]/g, "");
-  return digits ? parseInt(digits, 10) : 0;
+  if (typeof v === "number") return Number.isNaN(v) ? 0 : Math.round(v * 100) / 100;
+  let str = String(v).trim();
+  if (!str) return 0;
+
+  // Quitar símbolos de moneda, letras y espacios
+  str = str.replace(/[$'\sA-Za-z]/g, "");
+  if (!str) return 0;
+
+  const hasDot = str.includes(".");
+  const hasComma = str.includes(",");
+
+  if (hasDot && hasComma) {
+    const lastDot = str.lastIndexOf(".");
+    const lastComma = str.lastIndexOf(",");
+    if (lastComma > lastDot) {
+      // "1.250,50" -> punto es miles, coma es decimal
+      str = str.replace(/\./g, "").replace(",", ".");
+    } else {
+      // "1,250.50" -> coma es miles, punto es decimal
+      str = str.replace(/,/g, "");
+    }
+  } else if (hasComma) {
+    const parts = str.split(",");
+    if (parts.length > 2) {
+      // Varios separadores: "1,000,000" -> miles
+      str = parts.join("");
+    } else {
+      // Una sola coma: "15,50" o "15,5" o "50,000"
+      if (parts[1].length === 3 && parts[0].length >= 1) {
+        str = parts.join("");
+      } else {
+        str = parts[0] + "." + parts[1];
+      }
+    }
+  } else if (hasDot) {
+    const parts = str.split(".");
+    if (parts.length > 2) {
+      // Varios puntos: "1.000.000" -> miles
+      str = parts.join("");
+    } else {
+      // Un solo punto: si tiene 1 o 2 dígitos tras el punto, es decimal (ej. 15.50, 15.5)
+      // Si tiene exactamente 3 dígitos y la parte entera no es 0, es miles (ej. 50.000)
+      if (parts[1].length === 3 && parts[0].length >= 1 && parseInt(parts[0], 10) >= 1) {
+        str = parts.join("");
+      } else {
+        str = parts[0] + "." + parts[1];
+      }
+    }
+  }
+
+  str = str.replace(/[^\d.-]/g, "");
+  const num = parseFloat(str);
+  if (Number.isNaN(num)) return 0;
+  return Math.round(num * 100) / 100;
 }
 
 // Las fechas se guardan en UTC (datetime('now') de SQLite) y se muestran en hora de Colombia.

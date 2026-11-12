@@ -1,6 +1,6 @@
 {
   "name": "taller-reparaciones",
-  "version": "6.0.0",
+  "version": "7.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev -H 0.0.0.0",
@@ -15,6 +15,7 @@
     "@zxing/library": "^0.23.0",
     "bcryptjs": "^3.0.3",
     "bwip-js": "^4.11.4",
+    "exceljs": "^4.4.0",
     "jose": "^6.2.14",
     "nanoid": "^5.1.16",
     "next": "^15.5.28",

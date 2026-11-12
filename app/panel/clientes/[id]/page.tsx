@@ -127,7 +127,7 @@ export default async function ClientePage({ params }: { params: Promise<{ id: st
           {user.role === "admin" && (
             <form action={adjustCredit} className="flex gap-2">
               <input type="hidden" name="id" value={c.id} />
-              <input name="amount" className="input !min-h-10" inputMode="numeric" placeholder="$" required />
+              <input name="amount" type="number" step="any" min="0" className="input !min-h-10" inputMode="decimal" placeholder="$ 0.00" required />
               <button name="op" value="sumar" className="btn-ghost !min-h-10">+</button>
               <button name="op" value="restar" className="btn-ghost !min-h-10">−</button>
             </form>

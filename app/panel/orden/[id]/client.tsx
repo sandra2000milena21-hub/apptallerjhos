@@ -9,6 +9,7 @@ import { MEDIA_CATEGORIES, type CheckValue } from "@/lib/constants";
 import { addProductItem, createWompiLink, deliver, saveChecklistOut, processDeliveryAction } from "./actions";
 import { searchProductsAction } from "@/app/panel/inventario/actions";
 import { PAYMENT_METHODS } from "@/lib/constants";
+import { money, parseMoney } from "@/lib/format";
 
 export function OrderUploader({ orderId, defaultCategory }: { orderId: number; defaultCategory: string }) {
   const [category, setCategory] = useState(defaultCategory);
@@ -70,7 +71,7 @@ export function DeliverForm({ orderId, customerName, balance }: { orderId: numbe
   const [success, setSuccess] = useState<{ saleId?: number } | null>(null);
   const [pending, start] = useTransition();
 
-  const num = (v: string) => parseInt(v.replace(/\D/g, "") || "0", 10);
+  const num = (v: string | number) => parseMoney(v);
   const payAmount = payRemaining ? (customAmount ? num(customAmount) : balance) : 0;
   const pointsToEarn = Math.floor(payAmount / 1000);
 
@@ -84,7 +85,7 @@ export function DeliverForm({ orderId, customerName, balance }: { orderId: numbe
           <p className="font-extrabold text-white text-base">¡Equipo Entregado con Éxito!</p>
           <p className="text-xs text-slate-300 mt-0.5">
             Entregado a <b className="text-white">{to}</b>
-            {payAmount > 0 ? ` · Pago de $${payAmount.toLocaleString("es-CO")} en ${paymentMethod}` : ""}.
+            {payAmount > 0 ? ` · Pago de ${money(payAmount)} en ${paymentMethod}` : ""}.
           </p>
           {pointsToEarn > 0 && (
             <p className="text-xs text-amber-300 font-bold mt-1">
@@ -166,10 +167,13 @@ export function DeliverForm({ orderId, customerName, balance }: { orderId: numbe
                 <span className="text-xs text-slate-300">Monto:</span>
                 <div className="flex items-center gap-1.5">
                   <input
+                    type="number"
+                    step="any"
+                    min="0"
                     className="input !min-h-8 !w-28 text-right font-bold text-emerald-400 text-xs"
-                    inputMode="numeric"
-                    value={customAmount ? Number(customAmount).toLocaleString("es-CO") : ""}
-                    onChange={(e) => setCustomAmount(String(num(e.target.value)))}
+                    inputMode="decimal"
+                    value={customAmount}
+                    onChange={(e) => setCustomAmount(e.target.value)}
                   />
                   <button
                     type="button"
@@ -271,7 +275,7 @@ export function DeliverForm({ orderId, customerName, balance }: { orderId: numbe
           })
         }
       >
-        {pending ? "Procesando entrega y cobro…" : `✅ Confirmar Entrega ${payRemaining && payAmount > 0 ? `y Cobro ($${payAmount.toLocaleString("es-CO")})` : ""}`}
+        {pending ? "Procesando entrega y cobro…" : `✅ Confirmar Entrega ${payRemaining && payAmount > 0 ? `y Cobro (${money(payAmount)})` : ""}`}
       </button>
     </div>
   );

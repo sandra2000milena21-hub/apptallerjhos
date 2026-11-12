@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -35,7 +36,7 @@ export async function login(identifier: string, password: string): Promise<boole
     clean,
   )) as (SessionUser & { password_hash: string; permissions?: string | null }) | undefined;
   
-  if (!user || !bcrypt.compareSync(password, user.password_hash)) return false;
+  if (!user || !(await bcrypt.compare(password, user.password_hash))) return false;
   
   const token = await new SignJWT({ uid: user.id })
     .setProtectedHeader({ alg: "HS256" })
@@ -58,7 +59,8 @@ export async function logout() {
   (await cookies()).delete(COOKIE);
 }
 
-export async function currentUser(): Promise<SessionUser | null> {
+// cache(): el layout, la página y sus componentes comparten una sola verificación de sesión por petición.
+export const currentUser = cache(async (): Promise<SessionUser | null> => {
   const token = (await cookies()).get(COOKIE)?.value;
   if (!token) return null;
   try {
@@ -79,7 +81,7 @@ export async function currentUser(): Promise<SessionUser | null> {
   } catch {
     return null;
   }
-}
+});
 
 export async function requireUser(): Promise<SessionUser> {
   const user = await currentUser();

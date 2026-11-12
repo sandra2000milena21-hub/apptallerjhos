@@ -10,16 +10,9 @@ import SignaturePad from "@/components/SignaturePad";
 import ScanButton from "@/components/Scanner";
 import TermsAudioPlayer from "@/components/TermsAudioPlayer";
 import Combobox from "@/components/Combobox";
+import { parseMoney } from "@/lib/format";
 
 const STEPS = ["Cliente", "Equipo y falla", "Estado y pruebas", "Fotos y video", "Valores y firma"];
-
-function money(n: number) {
-  return n ? "$" + n.toLocaleString("es-CO") : "";
-}
-function digits(v: string) {
-  const d = v.replace(/\D/g, "");
-  return d ? parseInt(d, 10) : 0;
-}
 
 type History = Awaited<ReturnType<typeof lookupDevice>>;
 type Appointment = { id: number; name: string; phone: string; email: string | null; device_type: string; model: string | null; problem: string | null };
@@ -605,11 +598,11 @@ export default function Wizard({
             <div className="grid sm:grid-cols-3 gap-4">
               <div>
                 <label className="label">Diagnóstico</label>
-                <input className="input" inputMode="numeric" value={money(values.diagnostic_fee)} onChange={(e) => setValues({ ...values, diagnostic_fee: digits(e.target.value) })} placeholder="$0" />
+                <input className="input" type="number" step="any" min="0" inputMode="decimal" value={values.diagnostic_fee || ""} onChange={(e) => setValues({ ...values, diagnostic_fee: parseMoney(e.target.value) })} placeholder="$ 0.00" />
               </div>
               <div>
                 <label className="label">Valor estimado</label>
-                <input className="input" inputMode="numeric" value={money(values.estimate)} onChange={(e) => setValues({ ...values, estimate: digits(e.target.value) })} placeholder="Se cotiza tras diagnóstico" />
+                <input className="input" type="number" step="any" min="0" inputMode="decimal" value={values.estimate || ""} onChange={(e) => setValues({ ...values, estimate: parseMoney(e.target.value) })} placeholder="Se cotiza tras diagnóstico" />
               </div>
               <div>
                 <label className="label">Fecha estimada de entrega</label>
@@ -617,7 +610,7 @@ export default function Wizard({
               </div>
               <div>
                 <label className="label">Abono</label>
-                <input className="input" inputMode="numeric" value={money(values.deposit)} onChange={(e) => setValues({ ...values, deposit: digits(e.target.value) })} placeholder="$0" />
+                <input className="input" type="number" step="any" min="0" inputMode="decimal" value={values.deposit || ""} onChange={(e) => setValues({ ...values, deposit: parseMoney(e.target.value) })} placeholder="$ 0.00" />
               </div>
               <div>
                 <label className="label">Medio de pago</label>

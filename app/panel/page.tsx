@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { listOrders, parseJSON, type OrderWithCustomer } from "@/lib/orders";
+import { listOrders, parseJSON } from "@/lib/orders";
 import { deviceType, serviceLabel } from "@/lib/constants";
 import { StatusBadge } from "@/components/StatusBadge";
 import { dateOnly, daysSince, money } from "@/lib/format";
@@ -8,7 +8,7 @@ import { dbx } from "@/lib/db";
 import { lowStockCount } from "@/lib/inventory";
 import Board, { type BoardCard } from "./Board";
 import SearchBar from "./SearchBar";
-import DailyAssistantBubble from "@/components/DailyAssistantBubble";
+import AssistantLazy from "./AssistantLazy";
 
 export const metadata = { title: "Tablero" };
 
@@ -30,7 +30,8 @@ async function kpis() {
 
 export default async function Tablero({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const { q } = await searchParams;
-  const orders = await listOrders({ q });
+  // Órdenes e indicadores se consultan al mismo tiempo.
+  const [orders, k] = await Promise.all([listOrders({ q }), kpis()]);
 
   // Un código escaneado (número de orden exacto) abre la orden directamente.
   if (q) {
@@ -38,8 +39,9 @@ export default async function Tablero({ searchParams }: { searchParams: Promise<
     if (exact) redirect(`/panel/orden/${exact.id}`);
   }
 
-  const k = await kpis();
-  const services = (o: OrderWithCustomer) => parseJSON<string[]>(o.services, []);
+  // Los servicios vienen como JSON: se interpretan una sola vez por orden.
+  const servicesById = new Map(orders.map((o) => [o.id, parseJSON<string[]>(o.services, [])]));
+  const services = (o: { id: number }) => servicesById.get(o.id) ?? [];
   const wetWaiting = orders.filter((o) => o.status === "recibido" && services(o).includes("mojado"));
   const legalNotice = orders.filter((o) => o.status === "listo" && daysSince(o.ready_at) >= 30);
   const decided = orders.filter((o) => o.status === "cotizado" && ["aprobada", "rechazada"].includes(o.quote_status));
@@ -74,7 +76,7 @@ export default async function Tablero({ searchParams }: { searchParams: Promise<
       <div className="flex flex-wrap items-end gap-4 justify-between">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="w-2 h-2 rounded-full bg-emerald-400" />
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Taller Jhos en vivo</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">Tablero de Control</h1>
@@ -126,7 +128,7 @@ export default async function Tablero({ searchParams }: { searchParams: Promise<
       )}
 
       {/* Burbuja Asistente de Taller y Recordatorios Diarios */}
-      <DailyAssistantBubble
+      <AssistantLazy
         cards={cards}
         lowStock={k.lowStock}
         appointments={k.appointments}
@@ -155,7 +157,7 @@ function Kpi({
 }) {
   const body = (
     <div
-      className={`card p-4 h-full relative overflow-hidden group hover:border-blue-500/40 transition-all duration-200 ${
+      className={`card p-4 h-full relative overflow-hidden group ${href ? "hover:border-blue-500/40" : ""} ${
         warn ? "border-amber-500/40 bg-amber-500/[0.06]" : ""
       }`}
     >
@@ -181,7 +183,7 @@ function Alert({
   tone: "sky" | "amber" | "red";
   title: string;
   hint: string;
-  orders: OrderWithCustomer[];
+  orders: { id: number; number: string }[];
 }) {
   const styles = {
     sky: "bg-sky-500/10 border-sky-500/25 text-sky-200",
@@ -190,7 +192,7 @@ function Alert({
   }[tone];
 
   return (
-    <div className={`rounded-2xl border p-4 backdrop-blur-sm ${styles}`}>
+    <div className={`rounded-2xl border p-4 ${styles}`}>
       <p className="font-bold leading-snug text-white">{title}</p>
       <p className="text-xs text-slate-300 mt-0.5">{hint}</p>
       <div className="flex flex-wrap gap-1.5 mt-2.5">

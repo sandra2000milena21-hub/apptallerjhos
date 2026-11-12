@@ -70,6 +70,14 @@ export async function deleteMediaFile(filename: string) {
     } else {
       const fs = await import("node:fs");
       fs.unlinkSync(mediaPath(filename));
+      const id = filename.split(".")[0];
+      for (const w of [240, 480, 960]) {
+        try {
+          fs.unlinkSync(path.join(UPLOAD_DIR, ".thumbs", `${id}_${w}.jpg`));
+        } catch {
+          /* no había miniatura */
+        }
+      }
     }
   } catch {
     /* ya no existe */

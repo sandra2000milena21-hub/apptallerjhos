@@ -29,22 +29,27 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
   if (!o) notFound();
   const { nueva } = await searchParams;
 
-  const s = await getSettings();
-  const media = (await getMedia(id)).filter((m) => m.kind !== "signature");
-  const events = await getEvents(id);
-  const payments = await getPayments(id);
-  const t = await totals(id, o);
-  const base = await publicBaseUrl();
+  // Consultas independientes: se lanzan juntas en vez de una tras otra.
+  const [s, allMedia, events, payments, t, base, catalog, notices, techRows] = await Promise.all([
+    getSettings(),
+    getMedia(id),
+    getEvents(id),
+    getPayments(id),
+    totals(id, o),
+    publicBaseUrl(),
+    listCatalog(o.device_type),
+    getNotifications(id),
+    dbx.all("SELECT id, name FROM users WHERE active = 1 ORDER BY name"),
+  ]);
+  const media = allMedia.filter((m) => m.kind !== "signature");
+  const techs = techRows as { id: number; name: string }[];
   const trackUrl = `${base}/s/${o.token}`;
   const templates = whatsappTemplates(o, trackUrl, s, t);
   const services = parseJSON<string[]>(o.services, []);
   const dt = deviceType(o.device_type);
-  const catalog = await listCatalog(o.device_type);
-  const notices = await getNotifications(id);
   const wompiOn = Boolean(s.wompi_private_key);
   const checkIn = parseJSON<Record<string, CheckValue>>(o.checklist_in, {});
   const checkOut = parseJSON<Record<string, CheckValue>>(o.checklist_out, {});
-  const techs = (await dbx.all("SELECT id, name FROM users WHERE active = 1 ORDER BY name")) as { id: number; name: string }[];
   const delivered = o.status === "entregado";
 
   return (
@@ -294,7 +299,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
               <form action={addQuoteItem} className="grid grid-cols-[1fr_120px_auto] gap-2">
                 <input type="hidden" name="orderId" value={o.id} />
                 <input name="description" className="input !min-h-10" placeholder="Pantalla OLED" required />
-                <input name="amount" className="input !min-h-10" inputMode="numeric" placeholder="$" required />
+                <input name="amount" type="number" step="any" min="0" className="input !min-h-10" inputMode="decimal" placeholder="$ 0.00" required />
                 <button className="btn-ghost !min-h-10">+</button>
               </form>
             )}
@@ -356,7 +361,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
             )}
             <form action={addPayment} className="grid grid-cols-[1fr_1fr_auto] gap-2">
               <input type="hidden" name="orderId" value={o.id} />
-              <input name="amount" className="input !min-h-10" inputMode="numeric" placeholder="Valor" required />
+              <input name="amount" type="number" step="any" min="0" className="input !min-h-10" inputMode="decimal" placeholder="$ 0.00" required />
               <select name="method" className="input !min-h-10">
                 {PAYMENT_METHODS.map((m) => <option key={m}>{m}</option>)}
               </select>
@@ -463,7 +468,7 @@ function MediaTile({ m, orderId }: { m: Media; orderId: number }) {
           <video src={src} className="w-full h-full object-cover" preload="metadata" muted playsInline controls />
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={src} alt="" loading="lazy" className="w-full h-full object-cover" />
+          <img src={`${src}?w=480`} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
         )}
       </a>
       <div className="flex items-center justify-between gap-1 px-2 py-1.5 text-xs">

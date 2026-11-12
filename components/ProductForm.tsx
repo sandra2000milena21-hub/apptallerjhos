@@ -24,11 +24,11 @@ export default function ProductForm({ action, p }: { action: (fd: FormData) => P
       </div>
       <div>
         <label className="label">Costo</label>
-        <input name="cost" className="input" inputMode="numeric" defaultValue={v("cost")} placeholder="$" />
+        <input name="cost" type="number" step="any" min="0" className="input" inputMode="decimal" defaultValue={v("cost") !== "" ? Number(v("cost")) : ""} placeholder="$ 0.00" />
       </div>
       <div>
         <label className="label">Precio de venta</label>
-        <input name="price" className="input" inputMode="numeric" defaultValue={v("price")} placeholder="$" />
+        <input name="price" type="number" step="any" min="0" className="input" inputMode="decimal" defaultValue={v("price") !== "" ? Number(v("price")) : ""} placeholder="$ 0.00" />
       </div>
       {!p && (
         <div>

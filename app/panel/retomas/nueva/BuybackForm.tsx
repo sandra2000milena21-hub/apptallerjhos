@@ -8,9 +8,7 @@ import { BUYBACK_CHECKS, DEVICE_TYPES, GRADES, deviceType } from "@/lib/constant
 import SignaturePad from "@/components/SignaturePad";
 import ScanButton from "@/components/Scanner";
 import Combobox from "@/components/Combobox";
-
-const num = (v: string) => parseInt(v.replace(/\D/g, "") || "0", 10);
-const fmt = (n: number) => (n ? "$" + n.toLocaleString("es-CO") : "");
+import { money, parseMoney } from "@/lib/format";
 
 // Sugerencia de grado según las respuestas del checklist (el asesor puede cambiarlo).
 function suggestGrade(c: Record<string, boolean>): string {
@@ -178,7 +176,7 @@ export default function BuybackForm() {
         <div className="grid sm:grid-cols-3 gap-4">
           <div>
             <label className="label">Valor que se paga</label>
-            <input className="input" inputMode="numeric" value={fmt(price)} onChange={(e) => setPrice(num(e.target.value))} placeholder="$" />
+            <input className="input" type="number" step="any" min="0" inputMode="decimal" value={price || ""} onChange={(e) => setPrice(parseMoney(e.target.value))} placeholder="$ 0.00" />
           </div>
           <div>
             <label className="label">Forma de pago</label>
@@ -191,8 +189,8 @@ export default function BuybackForm() {
           </div>
           <div>
             <label className="label">Precio de venta sugerido</label>
-            <input className="input" inputMode="numeric" value={fmt(salePrice)} onChange={(e) => setSalePrice(num(e.target.value))} placeholder="$" />
-            {price > 0 && salePrice > 0 && <p className="text-xs text-muted mt-1">Margen: ${(salePrice - price).toLocaleString("es-CO")}</p>}
+            <input className="input" type="number" step="any" min="0" inputMode="decimal" value={salePrice || ""} onChange={(e) => setSalePrice(parseMoney(e.target.value))} placeholder="$ 0.00" />
+            {price > 0 && salePrice > 0 && <p className="text-xs text-muted mt-1">Margen: {money(salePrice - price)}</p>}
           </div>
         </div>
         <p className="text-sm text-muted">
