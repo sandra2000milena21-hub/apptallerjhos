@@ -24,14 +24,15 @@ async function book(fd: FormData) {
   if (recent.length >= 5) redirect("/agendar?error=limite");
   hits.set(ip, [...recent, now]);
 
-  const name = String(fd.get("name") || "").trim();
-  const phone = String(fd.get("phone") || "").trim();
+  if ((await getSettings()).booking_enabled !== "1") redirect("/agendar");
+  const name = String(fd.get("name") || "").trim().slice(0, 120);
+  const phone = String(fd.get("phone") || "").trim().slice(0, 30);
   const date = String(fd.get("date") || "");
   const time = String(fd.get("time") || "");
   const type = DEVICE_TYPES.some((d) => d.key === fd.get("device_type")) ? String(fd.get("device_type")) : "otro";
   const slot = (await availableSlots(30)).find((d) => d.date === date);
   if (!name || phone.replace(/\D/g, "").length < 7 || !slot || !slot.times.includes(time)) redirect("/agendar?error=datos");
-  (await dbx.run("INSERT INTO appointments (name, phone, email, device_type, model, problem, date, time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", name, phone, String(fd.get("email") || "") || null, type, String(fd.get("model") || "") || null, String(fd.get("problem") || "") || null, date, time));
+  (await dbx.run("INSERT INTO appointments (name, phone, email, device_type, model, problem, date, time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", name, phone, String(fd.get("email") || "").trim().slice(0, 200) || null, type, String(fd.get("model") || "").trim().slice(0, 120) || null, String(fd.get("problem") || "").trim().slice(0, 1000) || null, date, time));
   redirect(`/agendar?ok=${encodeURIComponent(`${slot.label} a las ${time}`)}`);
 }
 

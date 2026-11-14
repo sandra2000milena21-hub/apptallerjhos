@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { dbx, getSettings } from "@/lib/db";
 import { dateTime, money } from "@/lib/format";
 import PrintButton from "../../orden/[id]/imprimir/PrintButton";
@@ -10,7 +10,7 @@ import { ConfirmButton } from "../../orden/[id]/client";
 export const metadata = { title: "Recibo de venta" };
 
 export default async function SalePage({ params }: { params: Promise<{ id: string }> }) {
-  const user = await requireUser();
+  const user = await requirePermission("caja_view");
   const id = parseInt((await params).id, 10);
   const sale = (await dbx.get(
     `SELECT s.*, c.name AS customer_name, c.phone AS customer_phone, c.points AS customer_points, u.name AS user_name 

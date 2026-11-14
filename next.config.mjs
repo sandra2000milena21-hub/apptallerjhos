@@ -31,18 +31,20 @@ const nextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "X-Frame-Options", value: "SAMEORIGIN" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          // La cámara y el micrófono solo los usa la propia app (escáner y videos); nada de geolocalización.
+          { key: "Permissions-Policy", value: "camera=(self), microphone=(self), geolocation=(), payment=()" },
+          { key: "Content-Security-Policy", value: "frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'" },
         ],
+      },
+      {
+        // El panel y las páginas con token del cliente no deben aparecer en buscadores.
+        source: "/(panel|s|login|api)/:path*",
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
       },
       {
         source: "/_next/static/:path*",
         headers: [
           { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
-        ],
-      },
-      {
-        source: "/api/media/:path*",
-        headers: [
-          { key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=604800" },
         ],
       },
     ];

@@ -5,6 +5,9 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin, DEFAULT_PERMISSIONS_BY_ROLE, parsePermissions, type UserPermissions } from "@/lib/auth";
 import { dbx } from "@/lib/db";
 
+const MIN_PASSWORD = 8;
+const ROLES = ["admin", "tecnico", "asesor", "custom"];
+
 const PERMISSION_KEYS: (keyof UserPermissions)[] = [
   "orders_view",
   "caja_view",
@@ -45,9 +48,10 @@ export async function createUserAction(fd: FormData) {
   if (!name || !email) {
     return { ok: false, error: "El nombre y el correo o usuario son obligatorios." };
   }
-  if (!password || password.length < 4) {
-    return { ok: false, error: "La contraseña debe tener al menos 4 caracteres." };
+  if (!password || password.length < MIN_PASSWORD || password.length > 200) {
+    return { ok: false, error: `La contraseña debe tener al menos ${MIN_PASSWORD} caracteres.` };
   }
+  if (!ROLES.includes(role)) return { ok: false, error: "Rol inválido." };
 
   const existing = await dbx.get("SELECT id FROM users WHERE lower(email) = ?", email);
   if (existing) {
@@ -87,6 +91,10 @@ export async function updateUserAction(fd: FormData) {
   if (!id || !name || !email) {
     return { ok: false, error: "Faltan datos obligatorios." };
   }
+  if (!ROLES.includes(role)) return { ok: false, error: "Rol inválido." };
+  if (newPassword && (newPassword.length < MIN_PASSWORD || newPassword.length > 200)) {
+    return { ok: false, error: `La contraseña nueva debe tener al menos ${MIN_PASSWORD} caracteres.` };
+  }
 
   // Verificar correo único
   const existing = (await dbx.get("SELECT id FROM users WHERE lower(email) = ? AND id != ?", email, id)) as { id: number } | undefined;
@@ -99,7 +107,7 @@ export async function updateUserAction(fd: FormData) {
   const permissionsJson = id === me.id ? JSON.stringify(DEFAULT_PERMISSIONS_BY_ROLE.admin) : extractPermissions(fd, finalRole);
 
   try {
-    if (newPassword && newPassword.length >= 4) {
+    if (newPassword) {
       await dbx.run(
         `UPDATE users SET name = ?, email = ?, phone = ?, role = ?, permissions = ?, password_hash = ? WHERE id = ?`,
         name,
@@ -134,6 +142,7 @@ export async function toggleUserStatusAction(id: number) {
   if (id === me.id) {
     return { ok: false, error: "No puedes desactivar tu propia cuenta administradora." };
   }
+  if (!Number.isInteger(id)) return { ok: false, error: "Usuario inválido." };
   await dbx.run("UPDATE users SET active = 1 - active WHERE id = ?", id);
   revalidatePath("/panel/ajustes/usuarios");
   revalidatePath("/panel", "layout");
@@ -142,9 +151,10 @@ export async function toggleUserStatusAction(id: number) {
 
 export async function resetPasswordAction(id: number, newPass: string) {
   await requireAdmin();
-  if (!newPass || newPass.length < 4) {
-    return { ok: false, error: "La contraseña debe tener al menos 4 caracteres." };
+  if (typeof newPass !== "string" || newPass.length < MIN_PASSWORD || newPass.length > 200) {
+    return { ok: false, error: `La contraseña debe tener al menos ${MIN_PASSWORD} caracteres.` };
   }
+  if (!Number.isInteger(id)) return { ok: false, error: "Usuario inválido." };
   await dbx.run("UPDATE users SET password_hash = ? WHERE id = ?", bcrypt.hashSync(newPass, 10), id);
   revalidatePath("/panel/ajustes/usuarios");
   return { ok: true };
@@ -155,6 +165,7 @@ export async function deleteUserAction(id: number) {
   if (id === me.id) {
     return { ok: false, error: "No puedes eliminar tu propia cuenta de administrador." };
   }
+  if (!Number.isInteger(id)) return { ok: false, error: "Usuario inválido." };
   // Soft delete desactivando o borrar si no tiene dependencias
   try {
     await dbx.run("DELETE FROM users WHERE id = ?", id);

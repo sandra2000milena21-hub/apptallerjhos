@@ -13,6 +13,7 @@ export const runtime = "nodejs";
 // Soporta peticiones por rangos, que Safari en iPhone/iPad exige para reproducir video.
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  if (!/^[a-z0-9]{8,32}$/.test(id)) return new Response("No encontrado", { status: 404 });
   const media = (await dbx.get("SELECT * FROM media WHERE id = ?", id)) as Media | undefined;
   if (!media) return new Response("No encontrado", { status: 404 });
 

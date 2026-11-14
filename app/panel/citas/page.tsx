@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
-import { requireUser, requirePermission } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { dbx } from "@/lib/db";
 import { DEVICE_TYPES, deviceType } from "@/lib/constants";
 import { dateOnly, whatsappLink } from "@/lib/format";
@@ -11,7 +11,7 @@ export const metadata = { title: "Citas" };
 
 async function setStatus(fd: FormData) {
   "use server";
-  await requireUser();
+  await requirePermission("appointments_view");
   const status = String(fd.get("status"));
   if (!["pendiente", "confirmada", "cancelada"].includes(status)) return;
   (await dbx.run("UPDATE appointments SET status = ? WHERE id = ?", status, parseInt(String(fd.get("id")), 10)));
@@ -20,11 +20,14 @@ async function setStatus(fd: FormData) {
 
 async function createAppointment(fd: FormData) {
   "use server";
-  await requireUser();
-  const name = String(fd.get("name") || "").trim();
-  const phone = String(fd.get("phone") || "").trim();
-  if (!name || !phone || !fd.get("date") || !fd.get("time")) return;
-  (await dbx.run("INSERT INTO appointments (name, phone, device_type, model, problem, date, time, status, source) VALUES (?, ?, ?, ?, ?, ?, ?, 'confirmada', 'local')", name, phone, String(fd.get("device_type")), String(fd.get("model") || "") || null, String(fd.get("problem") || "") || null, String(fd.get("date")), String(fd.get("time"))));
+  await requirePermission("appointments_view");
+  const name = String(fd.get("name") || "").trim().slice(0, 200);
+  const phone = String(fd.get("phone") || "").trim().slice(0, 40);
+  const date = String(fd.get("date") || "");
+  const time = String(fd.get("time") || "");
+  if (!name || !phone || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) return;
+  const type = DEVICE_TYPES.some((d) => d.key === fd.get("device_type")) ? String(fd.get("device_type")) : "otro";
+  (await dbx.run("INSERT INTO appointments (name, phone, device_type, model, problem, date, time, status, source) VALUES (?, ?, ?, ?, ?, ?, ?, 'confirmada', 'local')", name, phone, type, String(fd.get("model") || "").slice(0, 120) || null, String(fd.get("problem") || "").slice(0, 2000) || null, date, time));
   revalidatePath("/panel/citas");
 }
 

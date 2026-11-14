@@ -1,12 +1,17 @@
 import { NextResponse } from "next/server";
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
-import { currentUser } from "@/lib/auth";
+import { currentUser, hasPermission } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
 // Firma los permisos para que el iPad suba fotos y videos directo a Vercel Blob (sin pasar por el límite de 4,5 MB de Vercel).
 export async function POST(request: Request) {
-  const body = (await request.json()) as HandleUploadBody;
+  let body: HandleUploadBody;
+  try {
+    body = (await request.json()) as HandleUploadBody;
+  } catch {
+    return NextResponse.json({ error: "Solicitud inválida" }, { status: 400 });
+  }
   try {
     const json = await handleUpload({
       body,
@@ -14,6 +19,7 @@ export async function POST(request: Request) {
       onBeforeGenerateToken: async () => {
         const user = await currentUser();
         if (!user) throw new Error("No autorizado");
+        if (!hasPermission(user, "orders_edit") && !hasPermission(user, "orders_create")) throw new Error("No tienes permiso para subir archivos");
         return {
           allowedContentTypes: ["image/*", "video/*"],
           maximumSizeInBytes: 1024 * 1024 * 1024,

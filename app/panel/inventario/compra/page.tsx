@@ -1,11 +1,11 @@
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import Tabs, { INVENTORY_TABS } from "@/components/Tabs";
 import PurchaseForm from "./PurchaseForm";
 
 export const metadata = { title: "Entrada de compra" };
 
 export default async function Compra() {
-  await requireUser();
+  await requirePermission("inventory_edit");
   return (
     <div className="space-y-5 max-w-4xl">
       <h1 className="text-[28px] font-bold tracking-tight">Inventario</h1>

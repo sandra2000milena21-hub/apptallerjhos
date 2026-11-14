@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { dbx, getSettings } from "@/lib/db";
 import { getEvents, getMedia, getOrder, getPayments, parseJSON, publicBaseUrl, totals, type Media } from "@/lib/orders";
 import { CHECK_LABELS, MEDIA_CATEGORIES, PAYMENT_METHODS, PRIORITIES, DIAGNOSTIC_PLANS, STATUSES, deviceType, type CheckValue } from "@/lib/constants";
@@ -23,7 +23,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 const CHECK_STYLE: Record<string, string> = { ok: "text-good", falla: "text-bad font-semibold", np: "text-muted" };
 
 export default async function OrderPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ nueva?: string }> }) {
-  await requireUser();
+  await requirePermission("orders_view");
   const id = parseInt((await params).id, 10);
   const o = await getOrder(id);
   if (!o) notFound();

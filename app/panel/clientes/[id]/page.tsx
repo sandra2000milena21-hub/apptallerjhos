@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { dbx } from "@/lib/db";
 import { deviceType } from "@/lib/constants";
 import { dateOnly, money, parseMoney, whatsappLink } from "@/lib/format";
@@ -11,15 +11,20 @@ export const metadata = { title: "Cliente" };
 
 async function saveCustomer(fd: FormData) {
   "use server";
-  await requireUser();
+  await requirePermission("customers_edit");
   const id = parseInt(String(fd.get("id")), 10);
-  (await dbx.run("UPDATE customers SET name = ?, doc_id = ?, phone = ?, email = ?, notes = ? WHERE id = ?", String(fd.get("name")), String(fd.get("doc_id") || "") || null, String(fd.get("phone")), String(fd.get("email") || "") || null, String(fd.get("notes") || "") || null, id));
+  const f = (k: string, max: number) => String(fd.get(k) ?? "").trim().slice(0, max);
+  const name = f("name", 200);
+  const phone = f("phone", 40);
+  // Sin nombre o celular no se guarda: evita dejar al cliente con el texto "null".
+  if (!id || !name || !phone) return;
+  (await dbx.run("UPDATE customers SET name = ?, doc_id = ?, phone = ?, email = ?, notes = ? WHERE id = ?", name, f("doc_id", 40) || null, phone, f("email", 200) || null, f("notes", 4000) || null, id));
   revalidatePath(`/panel/clientes/${id}`);
 }
 
 async function adjustCredit(fd: FormData) {
   "use server";
-  const user = await requireUser();
+  const user = await requirePermission("customers_view");
   if (user.role !== "admin") return;
   const id = parseInt(String(fd.get("id")), 10);
   const sign = fd.get("op") === "restar" ? -1 : 1;
@@ -29,7 +34,7 @@ async function adjustCredit(fd: FormData) {
 
 async function adjustPoints(fd: FormData) {
   "use server";
-  const user = await requireUser();
+  const user = await requirePermission("customers_view");
   if (user.role !== "admin") return;
   const id = parseInt(String(fd.get("id")), 10);
   const sign = fd.get("op") === "restar" ? -1 : 1;
@@ -40,7 +45,7 @@ async function adjustPoints(fd: FormData) {
 }
 
 export default async function ClientePage({ params }: { params: Promise<{ id: string }> }) {
-  const user = await requireUser();
+  const user = await requirePermission("customers_view");
   const id = parseInt((await params).id, 10);
   const c = (await dbx.get("SELECT * FROM customers WHERE id = ?", id)) as
     | { id: number; name: string; doc_id: string | null; phone: string; email: string | null; notes: string | null; store_credit: number; points?: number; created_at: string }

@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import path from "node:path";
+import { AsyncLocalStorage } from "node:async_hooks";
 import type { Client, InStatement, Transaction } from "@libsql/client";
 import { DEFAULT_TERMS } from "./constants";
 
@@ -387,6 +388,31 @@ export type Exec = {
 declare global {
   // eslint-disable-next-line no-var
   var __dbClient: Promise<Client> | undefined;
+  // eslint-disable-next-line no-var
+  var __dbQueue: Promise<unknown> | undefined;
+  // eslint-disable-next-line no-var
+  var __dbTxStore: AsyncLocalStorage<Exec> | undefined;
+}
+
+/**
+ * Transacción activa de la petición en curso. Mientras hay una abierta, TODO lo que use `dbx`
+ * dentro de ella (aunque olvide pasar la transacción) se ejecuta en esa misma transacción.
+ * Así no se puede bloquear la base consigo misma ni dejar datos a medias.
+ */
+const txStore = (global.__dbTxStore ??= new AsyncLocalStorage<Exec>());
+
+const isRemote = () => Boolean(process.env.TURSO_DATABASE_URL);
+
+/**
+ * SQLite local admite un solo escritor a la vez. En vez de dejar que dos peticiones choquen
+ * (SQLITE_BUSY), las operaciones se hacen en fila, una detrás de otra, sobre una única conexión.
+ * Con Turso (remoto) no hace falta: el servidor se encarga.
+ */
+function enqueue<T>(fn: () => Promise<T>): Promise<T> {
+  if (isRemote()) return fn();
+  const run = (global.__dbQueue ?? Promise.resolve()).then(fn, fn);
+  global.__dbQueue = run.catch(() => {});
+  return run;
 }
 
 function clean(args: Args) {
@@ -418,7 +444,8 @@ async function connect(): Promise<Client> {
     const fs = await import("node:fs");
     fs.mkdirSync(UPLOAD_DIR, { recursive: true });
     const { createClient } = await import("@libsql/client");
-    client = createClient({ url: "file:" + path.join(DATA_DIR, "taller.db") });
+    // Una sola conexión: los PRAGMA de abajo valen por conexión, y la fila de `enqueue` evita choques.
+    client = createClient({ url: "file:" + path.join(DATA_DIR, "taller.db"), concurrency: 1 });
     await client.execute("PRAGMA journal_mode = WAL");
     await client.execute("PRAGMA synchronous = NORMAL");
     await client.execute("PRAGMA cache_size = -8000"); // 8 MB cache
@@ -455,6 +482,11 @@ async function migrate(client: Client) {
   if (users === 0) {
     const email = (process.env.ADMIN_EMAIL || "admin@mitaller.co").toLowerCase();
     const password = process.env.ADMIN_PASSWORD || "admin1234";
+    if (process.env.NODE_ENV === "production" && isPublicDeployment() && isWeakAdminPassword(password)) {
+      throw new Error(
+        "ADMIN_PASSWORD no está configurada o es una clave de ejemplo. Define una clave fuerte (12+ caracteres) en el archivo .env antes del primer arranque.",
+      );
+    }
     const name = process.env.ADMIN_NAME || "Administrador";
     await client.execute({
       sql: "INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, 'admin')",
@@ -467,6 +499,15 @@ async function migrate(client: Client) {
   });
 }
 
+/** ¿La app queda expuesta a internet? (dominio público con HTTPS o Vercel). */
+function isPublicDeployment() {
+  return (process.env.PUBLIC_URL || "").startsWith("https://") || process.env.VERCEL === "1";
+}
+
+function isWeakAdminPassword(p: string) {
+  return p.length < 12 || /^(admin1234|cambia-esta-clave)$/i.test(p);
+}
+
 async function client(): Promise<Client> {
   if (!global.__dbClient) {
     global.__dbClient = connect().catch((e) => {
@@ -477,25 +518,50 @@ async function client(): Promise<Client> {
   return global.__dbClient;
 }
 
-/** Conexión normal (cada sentencia se confirma sola). */
+async function direct<K extends keyof Exec>(method: K, sql: string, args: Args): Promise<Awaited<ReturnType<Exec[K]>>> {
+  const active = txStore.getStore();
+  // Dentro de una transacción: se usa esa misma transacción.
+  if (active) return (active[method] as (sql: string, ...a: Args) => Promise<unknown>)(sql, ...args) as never;
+  const c = await client();
+  return enqueue(() => (wrap(c)[method] as (sql: string, ...a: Args) => Promise<unknown>)(sql, ...args)) as never;
+}
+
+/** Conexión normal (cada sentencia se confirma sola). Si hay una transacción abierta en la petición, se une a ella. */
 export const dbx: Exec = {
-  all: async (sql, ...args) => wrap(await client()).all(sql, ...args),
-  get: async (sql, ...args) => wrap(await client()).get(sql, ...args),
-  run: async (sql, ...args) => wrap(await client()).run(sql, ...args),
+  all: (sql, ...args) => direct("all", sql, args),
+  get: (sql, ...args) => direct("get", sql, args),
+  run: (sql, ...args) => direct("run", sql, args),
 };
 
 /** Ejecuta varias escrituras como una sola: si algo falla, no queda nada a medias. */
 export async function tx<T>(fn: (t: Exec) => Promise<T>): Promise<T> {
-  const t = await (await client()).transaction("write");
+  // Transacción dentro de otra: forma parte de la de afuera.
+  const outer = txStore.getStore();
+  if (outer) return fn(outer);
+  const c = await client();
+  return enqueue(async () => {
+    const t = await c.transaction("write");
+    try {
+      const ex = wrap(t);
+      const out = await txStore.run(ex, () => fn(ex));
+      await t.commit();
+      return out;
+    } catch (e) {
+      await t.rollback().catch(() => {});
+      throw e;
+    } finally {
+      t.close();
+    }
+  });
+}
+
+/** Comprobación rápida para el monitoreo del servidor. */
+export async function dbHealthy(): Promise<boolean> {
   try {
-    const out = await fn(wrap(t));
-    await t.commit();
-    return out;
-  } catch (e) {
-    await t.rollback().catch(() => {});
-    throw e;
-  } finally {
-    t.close();
+    await dbx.get("SELECT 1 AS ok");
+    return true;
+  } catch {
+    return false;
   }
 }
 

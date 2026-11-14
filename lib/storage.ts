@@ -22,10 +22,14 @@ const EXT: Record<string, string> = {
   "video/webm": "webm",
 };
 
+// Extensiones que se aceptan cuando el tipo exacto no está en la lista de arriba (p. ej. "image/jpg" o "video/3gpp").
+const SAFE_EXT = new Set(["jpg", "jpeg", "png", "webp", "heic", "heif", "gif", "avif", "bmp", "mp4", "mov", "m4v", "webm", "3gp", "mkv", "avi"]);
+
 export function extFor(mime: string, filename?: string): string {
   if (EXT[mime]) return EXT[mime];
+  // Nunca se guarda con una extensión ejecutable o de página web (.html, .js, .svg…): si no es conocida queda como .bin.
   const fromName = filename?.split(".").pop()?.toLowerCase();
-  return fromName && /^[a-z0-9]{2,5}$/.test(fromName) ? fromName : "bin";
+  return fromName && SAFE_EXT.has(fromName) ? fromName : "bin";
 }
 
 export function mediaPath(filename: string): string {
@@ -50,10 +54,14 @@ async function writeFile(name: string, buf: Buffer, mime: string): Promise<strin
 }
 
 export async function saveSignature(dataUrl: string, orderId: number | null, userId: number | null, ex: Exec = dbx): Promise<string | null> {
-  const m = /^data:image\/png;base64,(.+)$/.exec(dataUrl || "");
+  // Una firma pesa pocos KB; se rechaza cualquier cosa de más de ~3 MB.
+  if (typeof dataUrl !== "string" || dataUrl.length > 4_000_000) return null;
+  const m = /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
   if (!m) return null;
   const id = newMediaId();
   const buf = Buffer.from(m[1], "base64");
+  // Debe ser un PNG de verdad (firma de archivo PNG).
+  if (buf.length < 8 || buf.readUInt32BE(0) !== 0x89504e47) return null;
   const filename = await writeFile(`${id}.png`, buf, "image/png");
   await ex.run(
     "INSERT INTO media (id, order_id, kind, category, filename, mime, size, public, user_id) VALUES (?, ?, 'signature', 'firma', ?, 'image/png', ?, 0, ?)",

@@ -1,10 +1,10 @@
 "use server";
 
-import { requireUser } from "@/lib/auth";
+import { requireUser, hasPermission, NO_PERMISSION } from "@/lib/auth";
 import { dbx, tx, type Exec } from "@/lib/db";
 import { addEvent, newToken, nextOrderNumber } from "@/lib/orders";
 import { saveSignature } from "@/lib/storage";
-import { deviceType, PRIORITIES } from "@/lib/constants";
+import { deviceType, PRIORITIES, PAYMENT_METHODS } from "@/lib/constants";
 import { deviceHistory, findDevice, upsertDevice } from "@/lib/devices";
 import { guessIntake, type IntakeGuess } from "@/lib/ai";
 import { notifyOrderStatus } from "@/lib/notify";
@@ -26,7 +26,9 @@ export async function lookupDevice(imei: string, serial: string) {
 }
 
 export async function quickFill(text: string): Promise<IntakeGuess | null> {
-  await requireUser();
+  const user = await requireUser();
+  if (!hasPermission(user, "orders_create")) return null;
+  text = String(text ?? "").slice(0, 1000);
   if (!text.trim()) return null;
   return guessIntake(text);
 }
@@ -70,8 +72,48 @@ export type NewOrderInput = {
 
 export async function createOrder(input: NewOrderInput): Promise<{ ok: true; id: number } | { ok: false; error: string }> {
   const user = await requireUser();
-  const c = input.customer;
-  const d = input.device;
+  if (!hasPermission(user, "orders_create")) return { ok: false, error: NO_PERMISSION };
+  if (!input?.customer || !input.device || !input.intake || !input.values) return { ok: false, error: "Datos de la orden incompletos." };
+  // Todo lo que llega del navegador se normaliza a texto: un dato con forma rara no debe tumbar el guardado.
+  const txt = (v: unknown, max = 300) => (typeof v === "string" ? v : v == null ? "" : String(v)).slice(0, max);
+  const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+  const c = { id: Number.isInteger(input.customer.id) ? input.customer.id : undefined, name: txt(input.customer.name, 200), doc_id: txt(input.customer.doc_id, 40), phone: txt(input.customer.phone, 40), email: txt(input.customer.email, 200) };
+  const d = {
+    device_type: txt(input.device.device_type, 40),
+    brand: txt(input.device.brand, 80),
+    model: txt(input.device.model, 120),
+    color: txt(input.device.color, 60),
+    capacity: txt(input.device.capacity, 40),
+    imei: txt(input.device.imei, 40),
+    serial: txt(input.device.serial, 60),
+    passcode: txt(input.device.passcode, 100),
+    services: Array.isArray(input.device.services) ? input.device.services.map((x) => txt(x, 60)) : [],
+    problem: txt(input.device.problem, 4000),
+    accessories: txt(input.device.accessories, 1000),
+    priority: txt(input.device.priority, 20),
+  };
+  input = {
+    ...input,
+    intake: {
+      entered_off: Boolean(input.intake.entered_off),
+      checklist: input.intake.checklist && typeof input.intake.checklist === "object" ? input.intake.checklist : {},
+      battery_health: txt(input.intake.battery_health, 20),
+      condition_notes: txt(input.intake.condition_notes, 4000),
+    },
+    mediaIds: Array.isArray(input.mediaIds) ? input.mediaIds.map((x) => txt(x, 40)).slice(0, 100) : [],
+    values: {
+      diagnostic_fee: num(input.values.diagnostic_fee),
+      estimate: input.values.estimate == null ? null : num(input.values.estimate),
+      deposit: Math.max(0, num(input.values.deposit)),
+      deposit_method: PAYMENT_METHODS.includes(txt(input.values.deposit_method)) ? txt(input.values.deposit_method) : "Efectivo",
+      due_date: /^\d{4}-\d{2}-\d{2}$/.test(txt(input.values.due_date)) ? txt(input.values.due_date) : "",
+      warranty_months: Math.min(120, num(input.values.warranty_months)),
+    },
+    terms: txt(input.terms, 20000),
+    signature: typeof input.signature === "string" ? input.signature : null,
+    appointmentId: Number.isInteger(input.appointmentId) ? input.appointmentId : null,
+  };
+  if (input.values.deposit > 0 && !hasPermission(user, "caja_register")) return { ok: false, error: "No tienes permiso para registrar abonos. Deja el abono en $0 o pídele a caja que lo registre." };
   if (!c.name.trim() || !c.phone.trim()) return { ok: false, error: "Faltan el nombre o el celular del cliente." };
   if (!d.model.trim()) return { ok: false, error: "Falta el modelo del equipo." };
   if (!d.problem.trim()) return { ok: false, error: "Falta la falla según el cliente." };

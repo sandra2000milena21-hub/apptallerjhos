@@ -190,7 +190,7 @@ Abre http://localhost:3000. Sin Turso ni Blob, los datos quedan en la carpeta `d
 
 ## Otras formas de alojarla
 
-Sin Turso ni Blob, la app también funciona en un servidor propio con disco persistente. El `Dockerfile` y `docker-compose.yml` (con HTTPS por Caddy) sirven para un VPS o para Railway.
+Sin Turso ni Blob, la app también funciona en un servidor propio con disco persistente. El `Dockerfile` y `docker-compose.yml` (con HTTPS por Caddy) sirven para un VPS o para Railway. La guía paso a paso está en [DESPLIEGUE-VPS.md](DESPLIEGUE-VPS.md).
 
 ## Pendiente para una segunda fase
 

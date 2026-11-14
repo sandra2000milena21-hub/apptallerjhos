@@ -1,5 +1,16 @@
 node_modules
 .next
 data
-.env
 .git
+.claude
+# Secretos y configuración local: nunca entran a la imagen (se pasan con env_file al arrancar).
+.env
+.env.*
+!.env.example
+# Respaldos y archivos que no hacen falta para construir
+*.tar.gz
+*.zip
+*.bak
+*.log
+*.bat
+tsconfig.tsbuildinfo

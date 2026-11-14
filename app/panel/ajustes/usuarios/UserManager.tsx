@@ -244,8 +244,8 @@ export default function UserManager({ users, currentUserId }: Props) {
   async function handleSavePassword(e: React.FormEvent) {
     e.preventDefault();
     if (!passwordModalUser) return;
-    if (newPassword.length < 4) {
-      setErrorMsg("La contraseña debe tener mínimo 4 caracteres.");
+    if (newPassword.length < 8) {
+      setErrorMsg("La contraseña debe tener mínimo 8 caracteres.");
       return;
     }
     startTransition(async () => {
@@ -564,7 +564,7 @@ export default function UserManager({ users, currentUserId }: Props) {
                       required={!editingUser}
                       value={formData.password}
                       onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                      placeholder={editingUser ? "Dejar en blanco para no cambiarla" : "Mínimo 4 caracteres"}
+                      placeholder={editingUser ? "Dejar en blanco para no cambiarla" : "Mínimo 8 caracteres"}
                       autoComplete="new-password"
                       className="input rounded-xl bg-[#0d1726] border-white/10 text-white placeholder:text-slate-500 focus:border-blue-400"
                     />
@@ -738,7 +738,7 @@ export default function UserManager({ users, currentUserId }: Props) {
                   required
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Mínimo 4 caracteres"
+                  placeholder="Mínimo 8 caracteres"
                   autoComplete="new-password"
                   className="input rounded-xl bg-[#0d1726] border-white/10 text-white placeholder:text-slate-500 focus:border-blue-400"
                 />

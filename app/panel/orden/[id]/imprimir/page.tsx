@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import QRCode from "qrcode";
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { getSettings } from "@/lib/db";
 import { getOrder, getPayments, parseJSON, publicBaseUrl, totals } from "@/lib/orders";
 import { CHECK_LABELS, deviceType, serviceLabel, type CheckValue } from "@/lib/constants";
@@ -10,7 +10,7 @@ import PrintButton from "./PrintButton";
 export const metadata = { title: "Imprimir orden" };
 
 export default async function PrintPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireUser();
+  await requirePermission("orders_view");
   const id = parseInt((await params).id, 10);
   const o = await getOrder(id);
   if (!o) notFound();

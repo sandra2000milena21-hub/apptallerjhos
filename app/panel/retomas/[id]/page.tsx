@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { dbx, getSettings } from "@/lib/db";
 import { BUYBACK_CHECKS, GRADES, deviceType } from "@/lib/constants";
 import { dateTime, money } from "@/lib/format";
@@ -12,7 +12,7 @@ import { voidBuyback } from "../actions";
 export const metadata = { title: "Retoma" };
 
 export default async function BuybackPage({ params }: { params: Promise<{ id: string }> }) {
-  const user = await requireUser();
+  const user = await requirePermission("buybacks_view");
   const b = (await dbx.get("SELECT b.*, c.name AS seller, c.doc_id, c.phone, u.name AS user_name FROM buybacks b JOIN customers c ON c.id = b.customer_id LEFT JOIN users u ON u.id = b.user_id WHERE b.id = ?", parseInt((await params).id, 10))) as Record<string, string | number | null> | undefined;
   if (!b) notFound();
   const s = await getSettings();

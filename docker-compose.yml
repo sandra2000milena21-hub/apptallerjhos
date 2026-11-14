@@ -1,27 +1,55 @@
 # Para un servidor propio (VPS). Caddy pone el certificado HTTPS automáticamente.
+# Guía completa paso a paso: DESPLIEGUE-VPS.md
 # 1) Apunta tu dominio (ej. taller.midominio.co) a la IP del servidor.
-# 2) Copia .env.example como .env y llena los valores (PUBLIC_URL=https://taller.midominio.co).
-# 3) Cambia el dominio en el archivo Caddyfile.
-# 4) docker compose up -d --build
+# 2) Copia .env.example como .env y llena los valores (DOMAIN, PUBLIC_URL, SESSION_SECRET, ADMIN_*).
+# 3) docker compose up -d --build
 services:
   app:
     build: .
     restart: unless-stopped
+    init: true
     env_file: .env
     environment:
       DATA_DIR: /data
     volumes:
       - ./data:/data
+    # El puerto 3000 NO se publica: solo Caddy (dentro de la red de Docker) llega a la app.
+    expose:
+      - "3000"
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
   caddy:
     image: caddy:2
     restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?Define DOMAIN en el archivo .env (ej. taller.midominio.co)}
     ports:
       - "80:80"
       - "443:443"
+      - "443:443/udp"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
+      - caddy_config:/config
     depends_on:
-      - app
+      app:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 volumes:
   caddy_data:
+  caddy_config:

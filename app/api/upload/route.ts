@@ -2,7 +2,7 @@ import fs from "node:fs";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { NextRequest, NextResponse } from "next/server";
-import { currentUser } from "@/lib/auth";
+import { currentUser, hasPermission } from "@/lib/auth";
 import { dbx } from "@/lib/db";
 import { addEvent, newMediaId } from "@/lib/orders";
 import { extFor, mediaPath, storageMode } from "@/lib/storage";
@@ -21,6 +21,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const user = await currentUser();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  if (!hasPermission(user, "orders_edit") && !hasPermission(user, "orders_create")) return NextResponse.json({ error: "No tienes permiso para subir archivos" }, { status: 403 });
   if (storageMode() === "blob") return NextResponse.json({ error: "Usa la subida directa a Vercel Blob" }, { status: 400 });
 
   const mime = (req.headers.get("content-type") || "application/octet-stream").split(";")[0].trim().toLowerCase();
@@ -30,11 +31,16 @@ export async function POST(req: NextRequest) {
   const declared = parseInt(req.headers.get("content-length") || "0", 10);
   if (declared > MAX_BYTES) return NextResponse.json({ error: "Archivo demasiado grande" }, { status: 413 });
 
-  const name = decodeURIComponent(req.headers.get("x-filename") || "archivo");
+  let name = "archivo";
+  try {
+    name = decodeURIComponent(req.headers.get("x-filename") || "archivo");
+  } catch {
+    /* nombre mal codificado: se usa el genérico */
+  }
   const categoryRaw = req.headers.get("x-category") || "ingreso";
   const category = MEDIA_CATEGORIES.some((c) => c.key === categoryRaw) ? categoryRaw : "ingreso";
   const orderIdRaw = req.headers.get("x-order-id");
-  const orderId = orderIdRaw ? parseInt(orderIdRaw, 10) : null;
+  const orderId = orderIdRaw ? parseInt(orderIdRaw, 10) || null : null;
   const isPublic = req.headers.get("x-public") === "0" ? 0 : 1;
 
   if (orderId) {
@@ -59,6 +65,12 @@ export async function POST(req: NextRequest) {
       fs.unlinkSync(dest);
     } catch {}
     return NextResponse.json({ error: (e as Error).message || "Error al subir" }, { status: 500 });
+  }
+  if (size === 0) {
+    try {
+      fs.unlinkSync(dest);
+    } catch {}
+    return NextResponse.json({ error: "Archivo vacío" }, { status: 400 });
   }
 
   const kind = mime.startsWith("video/") ? "video" : "photo";

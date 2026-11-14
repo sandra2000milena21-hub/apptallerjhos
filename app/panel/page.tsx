@@ -5,6 +5,7 @@ import { deviceType, serviceLabel } from "@/lib/constants";
 import { StatusBadge } from "@/components/StatusBadge";
 import { dateOnly, daysSince, money } from "@/lib/format";
 import { dbx } from "@/lib/db";
+import { requireUser, hasPermission } from "@/lib/auth";
 import { lowStockCount } from "@/lib/inventory";
 import Board, { type BoardCard } from "./Board";
 import SearchBar from "./SearchBar";
@@ -28,8 +29,21 @@ async function kpis() {
   return { received, delivered, income: inc1 + inc2, appointments, lowStock };
 }
 
-export default async function Tablero({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
-  const { q } = await searchParams;
+const DENIED = "No tienes permiso para entrar a esa sección. Si lo necesitas, pídele al administrador que lo active en Ajustes → Usuarios.";
+
+export default async function Tablero({ searchParams }: { searchParams: Promise<{ q?: string; error?: string }> }) {
+  const { q, error } = await searchParams;
+  const user = await requireUser();
+  // Sin permiso de ver órdenes no se carga el tablero (ni sus cifras); el menú de arriba sigue disponible.
+  if (!hasPermission(user, "orders_view")) {
+    return (
+      <div className="card p-6 max-w-xl space-y-2">
+        <h1 className="text-xl font-bold text-white">Hola, {user.name.split(" ")[0]}</h1>
+        <p className="text-slate-300 text-sm">{error === "denegado" ? DENIED : "Tu usuario no tiene acceso al tablero de órdenes. Usa el menú de arriba para ir a tus secciones."}</p>
+      </div>
+    );
+  }
+  const canSeeMoney = hasPermission(user, "caja_view") || hasPermission(user, "reports_view");
   // Órdenes e indicadores se consultan al mismo tiempo.
   const [orders, k] = await Promise.all([listOrders({ q }), kpis()]);
 
@@ -73,6 +87,9 @@ export default async function Tablero({ searchParams }: { searchParams: Promise<
 
   return (
     <div className="space-y-6">
+      {error === "denegado" && (
+        <p className="rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-200 text-sm font-semibold px-4 py-3">{DENIED}</p>
+      )}
       <div className="flex flex-wrap items-end gap-4 justify-between">
         <div>
           <div className="flex items-center gap-2 mb-1">
@@ -89,7 +106,7 @@ export default async function Tablero({ searchParams }: { searchParams: Promise<
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3.5">
           <Kpi label="Recibidos hoy" value={String(k.received)} icon="📥" color="bg-blue-500/15 text-blue-400" />
           <Kpi label="Entregados hoy" value={String(k.delivered)} icon="✅" color="bg-indigo-500/15 text-indigo-400" />
-          <Kpi label="Ingresos de hoy" value={money(k.income)} href="/panel/reportes" icon="💰" color="bg-emerald-500/15 text-emerald-400" />
+          {canSeeMoney && <Kpi label="Ingresos de hoy" value={money(k.income)} href={hasPermission(user, "reports_view") ? "/panel/reportes" : undefined} icon="💰" color="bg-emerald-500/15 text-emerald-400" />}
           <Kpi label="Citas de hoy" value={String(k.appointments)} href="/panel/citas" icon="📅" color="bg-purple-500/15 text-purple-400" />
           <Kpi label="Stock bajo" value={String(k.lowStock)} href="/panel/inventario?bajo=1" warn={k.lowStock > 0} icon="⚠️" color="bg-amber-500/15 text-amber-400" />
         </div>

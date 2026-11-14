@@ -1,15 +1,16 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireUser } from "@/lib/auth";
+import { requireUser, requirePermission, hasPermission, NO_PERMISSION } from "@/lib/auth";
 import { dbx, tx, type Exec } from "@/lib/db";
 import { addEvent, getOrder, nextNumber, totals } from "@/lib/orders";
 import { getProduct, moveStock } from "@/lib/inventory";
 import { PAYMENT_METHODS } from "@/lib/constants";
 
 export async function findOrderForCheckout(code: string) {
-  await requireUser();
-  const c = code.trim().toUpperCase();
+  const viewer = await requireUser();
+  if (!hasPermission(viewer, "caja_view")) return null;
+  const c = String(code ?? "").trim().toUpperCase().slice(0, 40);
   if (!c) return null;
   const numDigits = c.replace(/\D/g, "");
   const padded = numDigits ? numDigits.padStart(4, "0") : "";
@@ -44,7 +45,8 @@ async function orderLine(id: number) {
 }
 
 export async function orderLineAction(id: number) {
-  await requireUser();
+  const viewer = await requireUser();
+  if (!hasPermission(viewer, "caja_view") || !Number.isInteger(id)) return null;
   return orderLine(id);
 }
 
@@ -57,8 +59,9 @@ async function customerPoints(id: number, ex: Exec = dbx) {
 }
 
 export async function findCustomerByPhone(phone: string) {
-  await requireUser();
-  const d = phone.replace(/\D/g, "");
+  const viewer = await requireUser();
+  if (!hasPermission(viewer, "caja_view")) return null;
+  const d = String(phone ?? "").replace(/\D/g, "");
   if (d.length < 7) return null;
   return (
     ((await dbx.get(
@@ -83,8 +86,16 @@ export async function createSale(input: {
   pointsRedeemed?: number;
 }): Promise<{ ok: true; id: number } | { ok: false; error: string }> {
   const user = await requireUser();
-  const lines = input.lines.filter((l) => l.qty > 0 && l.unitPrice >= 0);
+  if (!hasPermission(user, "caja_register")) return { ok: false, error: NO_PERMISSION };
+  if (!input || !Array.isArray(input.lines) || !Array.isArray(input.payments)) return { ok: false, error: "Venta inválida." };
+  const okNum = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n);
+  // Solo números válidos; las cantidades de producto deben ser enteras y el cobro de una orden siempre es 1 línea.
+  const lines = input.lines
+    .filter((l) => l && okNum(l.qty) && okNum(l.unitPrice) && l.qty > 0 && l.qty <= 100000 && l.unitPrice >= 0 && l.unitPrice <= 1e10)
+    .map((l) => ({ ...l, description: String(l.description ?? "").slice(0, 300), qty: l.type === "order" ? 1 : l.type === "product" ? Math.round(l.qty) : l.qty }))
+    .filter((l) => l.qty > 0) as SaleLine[];
   if (!lines.length) return { ok: false, error: "La venta no tiene productos." };
+  input = { ...input, discount: okNum(input.discount) ? input.discount : 0, payments: input.payments.filter((p) => p && okNum(p.amount)) };
   const subtotal = Math.round(lines.reduce((s, l) => s + l.qty * l.unitPrice, 0) * 100) / 100;
   const discount = Math.round(Math.min(Math.max(0, input.discount || 0), subtotal) * 100) / 100;
   const total = Math.round((subtotal - discount) * 100) / 100;
@@ -98,16 +109,29 @@ export async function createSale(input: {
   const orderLines = lines.filter((l) => l.type === "order");
   if (orderLines.length && discount > 0) return { ok: false, error: "No se puede aplicar descuento al cobro de una orden; ajusta la cotización." };
 
-  for (const l of lines) {
-    if (l.type === "product") {
-      const p = await getProduct(l.productId);
-      if (!p) return { ok: false, error: `Producto no encontrado: ${l.description}` };
-      if (p.track_stock && p.stock < l.qty) return { ok: false, error: `No hay stock suficiente de ${p.name} (quedan ${p.stock}).` };
-    }
-  }
+  // Una misma orden no puede venir dos veces en la venta.
+  const orderIds = orderLines.map((l) => (l as { orderId: number }).orderId);
+  if (new Set(orderIds).size !== orderIds.length) return { ok: false, error: "La misma orden está repetida en la venta." };
 
   try {
     const id = await tx(async (t) => {
+      // Las comprobaciones van dentro de la transacción: nadie puede vender la misma unidad ni cobrar el mismo saldo al tiempo.
+      const needed = new Map<number, number>();
+      for (const l of lines) if (l.type === "product") needed.set(l.productId, (needed.get(l.productId) ?? 0) + l.qty);
+      for (const [productId, qty] of needed) {
+        const p = await getProduct(productId, t);
+        if (!p || !p.active) throw new Error("Uno de los productos ya no existe en el inventario.");
+        if (p.track_stock && p.stock < qty) throw new Error(`No hay stock suficiente de ${p.name} (quedan ${p.stock}).`);
+      }
+      for (const l of lines) {
+        if (l.type !== "order") continue;
+        const o = await getOrder(l.orderId, t);
+        if (!o) throw new Error("La orden que se intenta cobrar no existe.");
+        const bal = (await totals(o.id, o, t)).balance;
+        if (l.unitPrice <= 0) throw new Error(`El cobro de la orden ${o.number} debe ser mayor a cero.`);
+        if (l.unitPrice > bal + 0.01) throw new Error(`La orden ${o.number} solo tiene $${bal.toLocaleString("es-CO")} de saldo pendiente.`);
+      }
+
       let customerId = input.customerId;
       if (!customerId && input.newCustomer?.phone) {
         const d = input.newCustomer.phone.replace(/\D/g, "");
@@ -120,8 +144,9 @@ export async function createSale(input: {
         }
       }
       if (!customerId && input.newCustomer?.name && input.newCustomer.phone) {
-        customerId = Number((await t.run("INSERT INTO customers (name, phone) VALUES (?, ?)", input.newCustomer.name, input.newCustomer.phone)).lastInsertRowid);
+        customerId = Number((await t.run("INSERT INTO customers (name, phone) VALUES (?, ?)", String(input.newCustomer.name).trim().slice(0, 200), String(input.newCustomer.phone).trim().slice(0, 40))).lastInsertRowid);
       }
+      if (customerId && !(await t.get("SELECT id FROM customers WHERE id = ?", customerId))) throw new Error("El cliente seleccionado no existe.");
       const creditUsed = payments.filter((p) => p.method === "Saldo a favor").reduce((s, p) => s + p.amount, 0);
       if (creditUsed > 0) {
         if (!customerId) throw new Error("Para pagar con saldo a favor elige el cliente.");
@@ -130,7 +155,7 @@ export async function createSale(input: {
       }
 
       // Fidelización: redención de puntos
-      const pointsRedeemed = Math.max(0, Math.round(input.pointsRedeemed || 0));
+      const pointsRedeemed = okNum(input.pointsRedeemed) ? Math.max(0, Math.round(input.pointsRedeemed)) : 0;
       if (pointsRedeemed > 0) {
         if (!customerId) throw new Error("Para redimir puntos debes seleccionar o registrar un cliente.");
         const currentPts = await customerPoints(customerId, t);
@@ -155,7 +180,7 @@ export async function createSale(input: {
           total,
           pointsEarned,
           pointsRedeemed,
-          input.note || null,
+          input.note ? String(input.note).slice(0, 500) : null,
           user.id,
         )).lastInsertRowid,
       );
@@ -197,12 +222,14 @@ export async function createSale(input: {
 }
 
 export async function voidSale(fd: FormData) {
-  const user = await requireUser();
+  const user = await requirePermission("caja_register");
   if (user.role === "tecnico") throw new Error("No tienes permisos para anular ventas.");
   const id = parseInt(String(fd.get("id")), 10);
-  const sale = (await dbx.get("SELECT * FROM sales WHERE id = ?", id)) as { id: number; number: string; status: string; customer_id: number | null } | undefined;
-  if (!sale || sale.status === "anulada") return;
+  if (!id) return;
   await tx(async (t) => {
+    // Se vuelve a leer dentro de la transacción: dos clics seguidos no anulan (ni devuelven stock) dos veces.
+    const sale = (await t.get("SELECT * FROM sales WHERE id = ?", id)) as { id: number; number: string; status: string; customer_id: number | null } | undefined;
+    if (!sale || sale.status === "anulada") return;
     const items = (await t.all("SELECT * FROM sale_items WHERE sale_id = ?", id)) as { product_id: number | null; order_id: number | null; qty: number }[];
     for (const it of items) {
       if (it.product_id) await moveStock({ productId: it.product_id, qty: it.qty, reason: "devolucion", ref: `Anulación ${sale.number}`, userId: user.id }, t);

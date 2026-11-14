@@ -6,8 +6,9 @@ export const metadata = { title: "Ingresar" };
 
 async function doLogin(formData: FormData) {
   "use server";
-  const ok = await login(String(formData.get("email") || ""), String(formData.get("password") || ""));
-  if (!ok) redirect("/login?error=1");
+  const result = await login(String(formData.get("email") || ""), String(formData.get("password") || ""));
+  if (result === "limited") redirect("/login?error=limite");
+  if (result !== "ok") redirect("/login?error=1");
   redirect("/panel");
 }
 
@@ -36,7 +37,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
 
         {error && (
           <div className="rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-semibold px-4 py-3 text-center">
-            Correo o contraseña incorrectos.
+            {error === "limite" ? "Demasiados intentos. Espera 15 minutos e inténtalo de nuevo." : "Correo o contraseña incorrectos."}
           </div>
         )}
 

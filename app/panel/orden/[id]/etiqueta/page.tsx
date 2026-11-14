@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { getSettings } from "@/lib/db";
 import { getOrder } from "@/lib/orders";
 import { code128Svg } from "@/lib/barcode";
@@ -10,7 +10,7 @@ export const metadata = { title: "Etiqueta" };
 
 // Etiqueta para pegar en el equipo o en su bolsa. Tamaño pensado para rollos de 62 × 29 mm (impresoras Brother/Zebra/térmicas).
 export default async function LabelPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ n?: string }> }) {
-  await requireUser();
+  await requirePermission("orders_view");
   const o = await getOrder(parseInt((await params).id, 10));
   if (!o) notFound();
   const copies = Math.min(Math.max(parseInt((await searchParams).n || "2", 10) || 2, 1), 6);

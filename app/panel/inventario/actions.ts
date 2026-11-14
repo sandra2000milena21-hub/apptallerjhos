@@ -2,18 +2,22 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireUser } from "@/lib/auth";
+import { requireUser, requirePermission, hasPermission, NO_PERMISSION } from "@/lib/auth";
 import { dbx, tx } from "@/lib/db";
 import { findProductByCode, getProduct, moveStock, searchProducts } from "@/lib/inventory";
 import { parseMoney } from "@/lib/format";
 import { PRODUCT_KINDS } from "@/lib/constants";
 
 export async function searchProductsAction(q: string) {
-  await requireUser();
+  const user = await requireUser();
+  if (!(["inventory_view", "caja_view", "orders_edit", "orders_create"] as const).some((k) => hasPermission(user, k))) return [];
+  q = String(q ?? "").slice(0, 100);
   const exact = await findProductByCode(q);
   const list = await searchProducts(q, { limit: 12 });
   const all = exact ? [exact, ...list.filter((p) => p.id !== exact.id)] : list;
-  return all.map((p) => ({ id: p.id, name: p.name, price: p.price, stock: p.stock, track_stock: p.track_stock, cost: p.cost, kind: p.kind, barcode: p.barcode }));
+  // El costo solo viaja al navegador si el usuario puede verlo.
+  const showCost = hasPermission(user, "view_costs") || hasPermission(user, "inventory_edit");
+  return all.map((p) => ({ id: p.id, name: p.name, price: p.price, stock: p.stock, track_stock: p.track_stock, cost: showCost ? p.cost : 0, kind: p.kind, barcode: p.barcode }));
 }
 
 function str(fd: FormData, k: string) {
@@ -22,7 +26,7 @@ function str(fd: FormData, k: string) {
 }
 
 export async function saveProduct(fd: FormData) {
-  const user = await requireUser();
+  const user = await requirePermission("inventory_edit");
   const id = parseInt(String(fd.get("id") || "0"), 10);
   const kind = PRODUCT_KINDS.some((k) => k.key === fd.get("kind")) ? String(fd.get("kind")) : "repuesto";
   const name = str(fd, "name");
@@ -59,19 +63,23 @@ export async function saveProduct(fd: FormData) {
 }
 
 export async function adjustStock(fd: FormData) {
-  const user = await requireUser();
+  const user = await requirePermission("inventory_edit");
   const id = parseInt(String(fd.get("id")), 10);
   const p = await getProduct(id);
   if (!p) return;
   const counted = parseInt(String(fd.get("counted") ?? ""), 10);
-  if (Number.isNaN(counted)) return;
-  const diff = counted - p.stock;
-  if (diff !== 0) await moveStock({ productId: id, qty: diff, reason: "ajuste", note: str(fd, "note") ?? "Conteo físico", userId: user.id });
+  if (Number.isNaN(counted) || counted < 0 || counted > 1_000_000) return;
+  await tx(async (t) => {
+    const current = await getProduct(id, t);
+    if (!current) return;
+    const diff = counted - current.stock;
+    if (diff !== 0) await moveStock({ productId: id, qty: diff, reason: "ajuste", note: str(fd, "note") ?? "Conteo físico", userId: user.id }, t);
+  });
   revalidatePath(`/panel/inventario/${id}`);
 }
 
 export async function archiveProduct(fd: FormData) {
-  const user = await requireUser();
+  const user = await requirePermission("inventory_edit");
   if (user.role === "tecnico") throw new Error("No tienes permisos para archivar productos.");
   const id = parseInt(String(fd.get("id")), 10);
   (await dbx.run("UPDATE products SET active = 0 WHERE id = ?", id));
@@ -81,7 +89,14 @@ export async function archiveProduct(fd: FormData) {
 
 export async function receivePurchase(input: { supplier: string; note: string; lines: { productId: number; qty: number; cost: number }[] }) {
   const user = await requireUser();
-  const lines = input.lines.filter((l) => l.productId && l.qty > 0);
+  if (!hasPermission(user, "inventory_edit")) return { ok: false, error: NO_PERMISSION };
+  if (!input || !Array.isArray(input.lines)) return { ok: false, error: "Compra inválida." };
+  const fin = (n: unknown) => typeof n === "number" && Number.isFinite(n);
+  input = { ...input, supplier: String(input.supplier ?? "").trim().slice(0, 200), note: String(input.note ?? "").trim().slice(0, 500) };
+  const lines = input.lines
+    .filter((l) => l && Number.isInteger(l.productId) && fin(l.qty) && l.qty > 0 && l.qty <= 1_000_000)
+    .map((l) => ({ productId: l.productId, qty: Math.round(l.qty), cost: fin(l.cost) && l.cost > 0 ? l.cost : 0 }))
+    .filter((l) => l.qty > 0);
   if (!lines.length) return { ok: false, error: "Agrega al menos un producto con cantidad." };
   const ref = `Compra ${input.supplier || ""}`.trim();
   await tx(async (t) => {
@@ -95,7 +110,7 @@ export async function receivePurchase(input: { supplier: string; note: string; l
 }
 
 export async function saveCatalogItem(fd: FormData) {
-  await requireUser();
+  await requirePermission("inventory_edit");
   const id = parseInt(String(fd.get("id") || "0"), 10);
   const name = str(fd, "name");
   if (!name) return;
@@ -107,7 +122,7 @@ export async function saveCatalogItem(fd: FormData) {
 }
 
 export async function deleteCatalogItem(fd: FormData) {
-  const user = await requireUser();
+  const user = await requirePermission("inventory_edit");
   if (user.role === "tecnico") throw new Error("No tienes permisos para eliminar ítems del catálogo.");
   (await dbx.run("UPDATE repair_catalog SET active = 0 WHERE id = ?", parseInt(String(fd.get("id")), 10)));
   revalidatePath("/panel/inventario/catalogo");

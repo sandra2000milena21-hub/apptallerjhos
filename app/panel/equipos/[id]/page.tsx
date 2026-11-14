@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { dbx } from "@/lib/db";
 import { deviceHistory, type Device } from "@/lib/devices";
 import { deviceType, serviceLabel } from "@/lib/constants";
@@ -11,7 +11,7 @@ import { dateOnly } from "@/lib/format";
 export const metadata = { title: "Historial del equipo" };
 
 export default async function DevicePage({ params }: { params: Promise<{ id: string }> }) {
-  await requireUser();
+  await requirePermission("orders_view");
   const d = (await dbx.get("SELECT * FROM devices WHERE id = ?", parseInt((await params).id, 10))) as Device | undefined;
   if (!d) notFound();
   const owner = d.customer_id ? ((await dbx.get("SELECT id, name, phone FROM customers WHERE id = ?", d.customer_id)) as { id: number; name: string; phone: string }) : null;

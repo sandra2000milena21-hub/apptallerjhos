@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { getProduct } from "@/lib/inventory";
 import { code128Svg } from "@/lib/barcode";
 import { money } from "@/lib/format";
@@ -8,7 +8,7 @@ import PrintButton from "../../../orden/[id]/imprimir/PrintButton";
 export const metadata = { title: "Etiquetas de producto" };
 
 export default async function ProductLabels({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ n?: string }> }) {
-  await requireUser();
+  await requirePermission("inventory_view");
   const p = await getProduct(parseInt((await params).id, 10));
   if (!p || !p.barcode) notFound();
   const n = Math.min(Math.max(parseInt((await searchParams).n || String(Math.max(p.stock, 1)), 10) || 1, 1), 60);

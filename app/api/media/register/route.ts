@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { currentUser } from "@/lib/auth";
+import { currentUser, hasPermission } from "@/lib/auth";
 import { dbx } from "@/lib/db";
 import { addEvent, newMediaId } from "@/lib/orders";
 import { MEDIA_CATEGORIES } from "@/lib/constants";
@@ -10,6 +10,7 @@ export const runtime = "nodejs";
 export async function POST(req: NextRequest) {
   const user = await currentUser();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  if (!hasPermission(user, "orders_edit") && !hasPermission(user, "orders_create")) return NextResponse.json({ error: "No tienes permiso para subir archivos" }, { status: 403 });
   const b = (await req.json().catch(() => null)) as {
     url?: string;
     contentType?: string;
@@ -25,7 +26,7 @@ export async function POST(req: NextRequest) {
   } catch {}
   if (!host.endsWith(".blob.vercel-storage.com")) return NextResponse.json({ error: "URL inválida" }, { status: 400 });
   const mime = b.contentType || "application/octet-stream";
-  if (!mime.startsWith("image/") && !mime.startsWith("video/")) return NextResponse.json({ error: "Tipo no permitido" }, { status: 400 });
+  if (mime === "image/svg+xml" || (!mime.startsWith("image/") && !mime.startsWith("video/"))) return NextResponse.json({ error: "Tipo no permitido" }, { status: 400 });
   const category = MEDIA_CATEGORIES.some((c) => c.key === b.category) ? b.category! : "ingreso";
   const orderId = b.orderId || null;
   if (orderId && !(await dbx.get("SELECT id FROM orders WHERE id = ?", orderId))) return NextResponse.json({ error: "Orden no existe" }, { status: 404 });

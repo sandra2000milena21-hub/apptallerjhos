@@ -1,0 +1,4 @@
+# Los scripts del servidor (Linux) deben conservar saltos de línea LF aunque se editen en Windows.
+*.sh text eol=lf
+Caddyfile text eol=lf
+Dockerfile text eol=lf

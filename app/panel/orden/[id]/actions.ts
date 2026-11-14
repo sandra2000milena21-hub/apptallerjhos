@@ -1,10 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireUser, hasPermission } from "@/lib/auth";
+import { requireUser, requirePermission, hasPermission, NO_PERMISSION } from "@/lib/auth";
 import { dbx, tx } from "@/lib/db";
 import { addEvent, getOrder, nextNumber, totals } from "@/lib/orders";
-import { STATUS_KEYS, statusInfo, deviceType, PRIORITIES } from "@/lib/constants";
+import { STATUS_KEYS, statusInfo, deviceType, PRIORITIES, PAYMENT_METHODS } from "@/lib/constants";
 import { getProduct, moveStock } from "@/lib/inventory";
 import { notifyOrderStatus } from "@/lib/notify";
 import { createPaymentLink } from "@/lib/wompi";
@@ -29,7 +29,8 @@ export async function changeStatus(fd: FormData) {
   const id = idOf(fd);
   const status = String(fd.get("status"));
   if (!STATUS_KEYS.includes(status as never)) return;
-  const note = String(fd.get("note") || "").trim();
+  if (!(await dbx.get("SELECT id FROM orders WHERE id = ?", id))) return;
+  const note = String(fd.get("note") || "").trim().slice(0, 2000);
   const isPublic = fd.get("public") === "on";
   const sets = ["status = ?"];
   const params: unknown[] = [status];
@@ -61,16 +62,16 @@ export async function changeStatus(fd: FormData) {
 }
 
 export async function addNote(fd: FormData) {
-  const user = await requireUser();
+  const user = await requirePermission("orders_edit");
   const id = idOf(fd);
-  const body = String(fd.get("body") || "").trim();
+  const body = String(fd.get("body") || "").trim().slice(0, 4000);
   if (!body) return;
   await addEvent({ orderId: id, type: "note", body, isPublic: fd.get("public") === "on", userId: user.id });
   refresh(id);
 }
 
 export async function assignTechnician(fd: FormData) {
-  const user = await requireUser();
+  const user = await requirePermission("orders_edit");
   const id = idOf(fd);
   const techId = parseInt(String(fd.get("technician_id") || "0"), 10) || null;
   (await dbx.run("UPDATE orders SET technician_id = ? WHERE id = ?", techId, id));
@@ -92,10 +93,14 @@ export async function addQuoteItem(fd: FormData) {
 
 async function addItemWithPart(orderId: number, description: string, amount: number, productId: number | null, userId: number) {
   const order = await getOrder(orderId);
-  const product = productId ? await getProduct(productId) : undefined;
-  (await dbx.run("INSERT INTO quote_items (order_id, description, amount, product_id, qty, unit_cost) VALUES (?, ?, ?, ?, 1, ?)", orderId, description, amount, product?.id ?? null, product?.cost ?? 0));
-  // El repuesto sale del inventario apenas entra a la orden; si se quita, vuelve.
-  if (product) await moveStock({ productId: product.id, qty: -1, reason: "reparacion", ref: order?.number, userId });
+  if (!order) return;
+  // Ítem y salida de inventario van juntos: o se guardan los dos o ninguno.
+  await tx(async (t) => {
+    const product = productId ? await getProduct(productId, t) : undefined;
+    await t.run("INSERT INTO quote_items (order_id, description, amount, product_id, qty, unit_cost) VALUES (?, ?, ?, ?, 1, ?)", orderId, description, amount, product?.id ?? null, product?.cost ?? 0);
+    // El repuesto sale del inventario apenas entra a la orden; si se quita, vuelve.
+    if (product) await moveStock({ productId: product.id, qty: -1, reason: "reparacion", ref: order.number, userId }, t);
+  });
 }
 
 export async function addCatalogItem(fd: FormData) {
@@ -129,13 +134,17 @@ export async function removeQuoteItem(fd: FormData) {
     | { id: number; product_id: number | null; qty: number }
     | undefined;
   if (!item) return;
-  (await dbx.run("DELETE FROM quote_items WHERE id = ?", item.id));
-  if (item.product_id) await moveStock({ productId: item.product_id, qty: item.qty, reason: "devolucion", ref: (await getOrder(id))?.number, userId: user.id });
+  const number = (await getOrder(id))?.number;
+  await tx(async (t) => {
+    // Si otra petición ya lo quitó, no se devuelve el repuesto dos veces.
+    const gone = await t.run("DELETE FROM quote_items WHERE id = ?", item.id);
+    if (gone.changes && item.product_id) await moveStock({ productId: item.product_id, qty: item.qty, reason: "devolucion", ref: number, userId: user.id }, t);
+  });
   refresh(id);
 }
 
 export async function setPriority(fd: FormData) {
-  const user = await requireUser();
+  const user = await requirePermission("orders_edit");
   const id = idOf(fd);
   const p = String(fd.get("priority"));
   if (!PRIORITIES.some((x) => x.key === p)) return;
@@ -145,7 +154,7 @@ export async function setPriority(fd: FormData) {
 }
 
 export async function resendNotice(fd: FormData) {
-  await requireUser();
+  await requirePermission("orders_edit");
   const id = idOf(fd);
   const o = await getOrder(id);
   if (!o) return;
@@ -155,6 +164,7 @@ export async function resendNotice(fd: FormData) {
 
 export async function createWompiLink(fd: FormData): Promise<{ ok: boolean; url?: string; error?: string }> {
   const user = await requireUser();
+  if (!hasPermission(user, "caja_register")) return { ok: false, error: NO_PERMISSION };
   const id = idOf(fd);
   const o = await getOrder(id);
   if (!o) return { ok: false, error: "Orden no existe" };
@@ -177,7 +187,7 @@ export async function createWompiLink(fd: FormData): Promise<{ ok: boolean; url?
 }
 
 export async function sendQuote(fd: FormData) {
-  const user = await requireUser();
+  const user = await requirePermission("orders_edit");
   const id = idOf(fd);
   const order = await getOrder(id);
   if (!order) return;
@@ -197,45 +207,57 @@ export async function sendQuote(fd: FormData) {
 }
 
 export async function decideQuote(fd: FormData) {
-  const user = await requireUser();
+  const user = await requirePermission("orders_edit");
   const id = idOf(fd);
   const decision = fd.get("decision") === "aprobada" ? "aprobada" : "rechazada";
-  (await dbx.run("UPDATE orders SET quote_status = ?, quote_decided_at = datetime('now'), quote_decided_by = ? WHERE id = ?", decision, `${user.name} (registrado en el local)`, id));
-  if (decision === "rechazada") {
-    const items = (await dbx.all("SELECT * FROM quote_items WHERE order_id = ? AND product_id IS NOT NULL", id)) as { id: number; product_id: number; qty: number }[];
-    const order = await getOrder(id);
-    for (const it of items) {
-      await moveStock({ productId: it.product_id, qty: it.qty, reason: "devolucion", ref: `${order?.number} (rechazada)`, userId: user.id });
-      await dbx.run("UPDATE quote_items SET product_id = NULL WHERE id = ?", it.id);
+  const order = await getOrder(id);
+  if (!order) return;
+  await tx(async (t) => {
+    await t.run("UPDATE orders SET quote_status = ?, quote_decided_at = datetime('now'), quote_decided_by = ? WHERE id = ?", decision, `${user.name} (registrado en el local)`, id);
+    if (decision === "rechazada") {
+      const items = (await t.all("SELECT * FROM quote_items WHERE order_id = ? AND product_id IS NOT NULL", id)) as { id: number; product_id: number; qty: number }[];
+      for (const it of items) {
+        await moveStock({ productId: it.product_id, qty: it.qty, reason: "devolucion", ref: `${order.number} (rechazada)`, userId: user.id }, t);
+        await t.run("UPDATE quote_items SET product_id = NULL WHERE id = ?", it.id);
+      }
     }
-  }
-  await addEvent({
-    orderId: id,
-    type: "quote",
-    body: decision === "aprobada" ? "Cotización aprobada por el cliente (WhatsApp/teléfono)." : "Cotización rechazada por el cliente. Los repuestos reservados volvieron al inventario.",
-    isPublic: true,
-    userId: user.id,
+    await addEvent({
+      orderId: id,
+      type: "quote",
+      body: decision === "aprobada" ? "Cotización aprobada por el cliente (WhatsApp/teléfono)." : "Cotización rechazada por el cliente. Los repuestos reservados volvieron al inventario.",
+      isPublic: true,
+      userId: user.id,
+    }, t);
   });
   refresh(id);
 }
 
 export async function addPayment(fd: FormData) {
-  const user = await requireUser();
+  const user = await requirePermission("caja_register");
   const id = idOf(fd);
   const amount = parseMoney(fd.get("amount"));
-  if (amount <= 0) return;
-  const method = String(fd.get("method") || "Efectivo");
-  const note = String(fd.get("note") || "").trim() || null;
+  if (!Number.isFinite(amount) || amount <= 0) return;
+  if (!(await dbx.get("SELECT id FROM orders WHERE id = ?", id))) return;
+  const rawMethod = String(fd.get("method") || "Efectivo");
+  const method = PAYMENT_METHODS.includes(rawMethod) ? rawMethod : "Efectivo";
+  const note = String(fd.get("note") || "").trim().slice(0, 500) || null;
   (await dbx.run("INSERT INTO payments (order_id, amount, method, note, user_id) VALUES (?, ?, ?, ?, ?)", id, amount, method, note, user.id));
   await addEvent({ orderId: id, type: "payment", body: `Pago registrado: $${amount.toLocaleString("es-CO")} (${method})`, userId: user.id });
   refresh(id);
 }
 
 export async function saveChecklistOut(fd: FormData) {
-  const user = await requireUser();
+  const user = await requirePermission("orders_edit");
   const id = idOf(fd);
-  const raw = JSON.parse(String(fd.get("checklist") || "{}")) as Record<string, string>;
+  let raw: Record<string, string> = {};
+  try {
+    const parsed = JSON.parse(String(fd.get("checklist") || "{}"));
+    if (parsed && typeof parsed === "object") raw = parsed as Record<string, string>;
+  } catch {
+    /* lista inválida: se trata como vacía */
+  }
   const order = await getOrder(id);
+  if (!order) return;
   const clean = Object.fromEntries(deviceType(order?.device_type).checklist.map((i) => [i.key, ["ok", "falla", "np"].includes(raw[i.key]) ? raw[i.key] : "np"]));
   (await dbx.run("UPDATE orders SET checklist_out = ? WHERE id = ?", JSON.stringify(clean), id));
   const fails = Object.values(clean).filter((v) => v === "falla").length;
@@ -250,28 +272,32 @@ export async function saveChecklistOut(fd: FormData) {
 
 export async function deliver(fd: FormData): Promise<{ ok: boolean; error?: string }> {
   const user = await requireUser();
+  if (!hasPermission(user, "orders_edit")) return { ok: false, error: NO_PERMISSION };
   const id = idOf(fd);
+  if (!(await dbx.get("SELECT id FROM orders WHERE id = ?", id))) return { ok: false, error: "Orden no encontrada." };
   const signature = String(fd.get("signature") || "");
   const receivedBy = String(fd.get("delivered_to") || "").trim();
   if (!signature) return { ok: false, error: "Falta la firma de recibido." };
   if (!receivedBy) return { ok: false, error: "Escribe quién recibe el equipo." };
-  const sigId = await saveSignature(signature, id, user.id);
-  (await dbx.run("UPDATE orders SET status = 'entregado', delivered_at = datetime('now'), delivery_signature = ?, delivered_to = ? WHERE id = ?", sigId, receivedBy, id));
-  await addEvent({ orderId: id, type: "status", status: "entregado", body: `Equipo entregado a ${receivedBy}, recibido a satisfacción.`, isPublic: true, userId: user.id });
+  await tx(async (t) => {
+    const sigId = await saveSignature(signature, id, user.id, t);
+    await t.run("UPDATE orders SET status = 'entregado', delivered_at = datetime('now'), delivery_signature = ?, delivered_to = ? WHERE id = ?", sigId, receivedBy, id);
+    await addEvent({ orderId: id, type: "status", status: "entregado", body: `Equipo entregado a ${receivedBy}, recibido a satisfacción.`, isPublic: true, userId: user.id }, t);
+  });
   await notifyOrderStatus(id, "entregado");
   refresh(id);
   return { ok: true };
 }
 
 export async function toggleMediaPublic(fd: FormData) {
-  await requireUser();
+  await requirePermission("orders_edit");
   const id = idOf(fd);
   (await dbx.run("UPDATE media SET public = 1 - public WHERE id = ? AND order_id = ?", String(fd.get("mediaId")), id));
   refresh(id);
 }
 
 export async function deleteMedia(fd: FormData) {
-  const user = await requireUser();
+  const user = await requirePermission("orders_edit");
   const id = idOf(fd);
   const m = (await dbx.get("SELECT filename FROM media WHERE id = ? AND order_id = ? AND kind != 'signature'", String(fd.get("mediaId")), id)) as
     | { filename: string }
@@ -284,9 +310,10 @@ export async function deleteMedia(fd: FormData) {
 }
 
 export async function updateDueDate(fd: FormData) {
-  const user = await requireUser();
+  const user = await requirePermission("orders_edit");
   const id = idOf(fd);
-  const due = String(fd.get("due_date") || "") || null;
+  const dueRaw = String(fd.get("due_date") || "");
+  const due = /^\d{4}-\d{2}-\d{2}$/.test(dueRaw) ? dueRaw : null;
   (await dbx.run("UPDATE orders SET due_date = ? WHERE id = ?", due, id));
   await addEvent({ orderId: id, type: "system", body: due ? `Nueva fecha estimada de entrega: ${due}` : "Fecha de entrega sin definir", isPublic: true, userId: user.id });
   refresh(id);
@@ -305,7 +332,9 @@ export type OrderDeliveryInfo = {
 };
 
 export async function getOrderDeliveryInfo(orderId: number): Promise<OrderDeliveryInfo | null> {
-  await requireUser();
+  const viewer = await requireUser();
+  if (!hasPermission(viewer, "orders_view")) return null;
+  if (!Number.isInteger(orderId)) return null;
   const o = await getOrder(orderId);
   if (!o) return null;
   const t = await totals(orderId, o);
@@ -335,23 +364,37 @@ export type DeliveryProcessInput = {
 
 export async function processDeliveryAction(input: DeliveryProcessInput): Promise<{ ok: boolean; error?: string; saleId?: number }> {
   const user = await requireUser();
-  const id = input.orderId;
+  if (!hasPermission(user, "orders_edit")) return { ok: false, error: NO_PERMISSION };
+  const id = Number(input?.orderId);
+  if (!Number.isInteger(id)) return { ok: false, error: "Orden inválida." };
   const o = await getOrder(id);
   if (!o) return { ok: false, error: "Orden no encontrada." };
+  if (o.status === "entregado") return { ok: false, error: "Esta orden ya fue entregada." };
+  if (input.payRemaining && !hasPermission(user, "caja_register")) {
+    return { ok: false, error: "No tienes permiso para registrar cobros. Entrega sin cobrar o pídele a caja que registre el pago." };
+  }
 
-  const receivedBy = (input.deliveredTo || o.customer_name).trim();
+  const receivedBy = String(input.deliveredTo || o.customer_name || "").trim().slice(0, 200);
   if (!receivedBy) return { ok: false, error: "Indica quién recibe el equipo." };
+  const requested = Number(input.paymentAmount);
+  const method = PAYMENT_METHODS.includes(input.paymentMethod) ? input.paymentMethod : "Efectivo";
 
-  const t = await totals(id, o);
   let saleId: number | undefined = undefined;
 
   try {
     await tx(async (db) => {
+      // El saldo se calcula dentro de la transacción: si otro usuario cobró hace un segundo, no se cobra dos veces.
+      const t = await totals(id, o, db);
       // 1. Si hay saldo restante y se marcó para cobrar:
       if (input.payRemaining && t.balance > 0) {
-        const amount = Math.min(Math.max(0, input.paymentAmount || t.balance), t.balance);
+        const amount = Math.min(Math.max(0, Number.isFinite(requested) && requested > 0 ? Math.round(requested * 100) / 100 : t.balance), t.balance);
         if (amount > 0) {
-          const method = input.paymentMethod || "Efectivo";
+          if (method === "Saldo a favor") {
+            // El saldo a favor se descuenta de verdad del cliente (antes solo se anotaba el método).
+            const credit = ((await db.get("SELECT store_credit FROM customers WHERE id = ?", o.customer_id)) as { store_credit: number } | undefined)?.store_credit ?? 0;
+            if (credit < amount) throw new Error(`El cliente solo tiene $${credit.toLocaleString("es-CO")} de saldo a favor.`);
+            await db.run("UPDATE customers SET store_credit = store_credit - ? WHERE id = ?", amount, o.customer_id);
+          }
           const saleNumber = await nextNumber("sale_prefix", "next_sale", "V-", db);
           const pointsEarned = o.customer_id && amount > 0 ? Math.floor(amount / 1000) : 0;
 
@@ -404,12 +447,12 @@ export async function processDeliveryAction(input: DeliveryProcessInput): Promis
       }
 
       // 2. Nota final de reparación
-      if (input.finalNote && input.finalNote.trim()) {
+      if (input.finalNote && String(input.finalNote).trim()) {
         await addEvent(
           {
             orderId: o.id,
             type: "note",
-            body: `Nota final de entrega: ${input.finalNote.trim()}`,
+            body: `Nota final de entrega: ${String(input.finalNote).trim().slice(0, 2000)}`,
             isPublic: input.noteIsPublic ?? true,
             userId: user.id,
           },
@@ -419,8 +462,8 @@ export async function processDeliveryAction(input: DeliveryProcessInput): Promis
 
       // 3. Firma digital
       let sigId: string | null = null;
-      if (input.signature && input.signature.startsWith("data:image")) {
-        sigId = await saveSignature(input.signature, o.id, user.id);
+      if (typeof input.signature === "string" && input.signature.startsWith("data:image")) {
+        sigId = await saveSignature(input.signature, o.id, user.id, db);
       }
 
       // 4. Actualizar orden a "entregado"

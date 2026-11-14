@@ -1,6 +1,18 @@
-taller.midominio.co {
+# El dominio se toma de la variable DOMAIN del archivo .env (ej. DOMAIN=taller.midominio.co).
+# Caddy pide y renueva solo el certificado HTTPS.
+{$DOMAIN} {
+	encode zstd gzip
+
+	# Fotos y videos de hasta 1 GB.
 	request_body {
 		max_size 1GB
 	}
+
+	header {
+		# Obliga HTTPS en visitas futuras (1 año).
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+
 	reverse_proxy app:3000
 }

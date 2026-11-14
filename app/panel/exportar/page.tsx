@@ -1,4 +1,4 @@
-import { requireUser } from "@/lib/auth";
+import { requireAnyPermission, hasPermission } from "@/lib/auth";
 import { dbx } from "@/lib/db";
 import ExportView from "./ExportView";
 
@@ -7,7 +7,8 @@ export const metadata = {
 };
 
 export default async function ExportarPage() {
-  await requireUser();
+  const user = await requireAnyPermission("reports_view", "orders_view");
+  const canSeeMoney = hasPermission(user, "reports_view");
 
   // Fecha actual en Colombia (UTC-5)
   const now = new Date();
@@ -33,7 +34,8 @@ export default async function ExportarPage() {
   )) as { total: number; delivered: number } | undefined;
 
   const orderIncome = (await dbx.get(
-    "SELECT COALESCE(SUM(amount), 0) AS total FROM payments WHERE created_at BETWEEN ? AND ?",
+    // Los pagos cobrados en caja ya van dentro del total de la venta: aquí solo los abonos directos a la orden.
+    "SELECT COALESCE(SUM(amount), 0) AS total FROM payments WHERE sale_id IS NULL AND created_at BETWEEN ? AND ?",
     ...range,
   )) as { total: number } | undefined;
 
@@ -47,8 +49,9 @@ export default async function ExportarPage() {
     ...range,
   )) as { total: number } | undefined;
 
-  const totalIncome = (orderIncome?.total ?? 0) + (salesToday?.total ?? 0);
-  const totalExpenses = expensesToday?.total ?? 0;
+  // Sin permiso de reportes no se muestran cifras de dinero.
+  const totalIncome = canSeeMoney ? (orderIncome?.total ?? 0) + (salesToday?.total ?? 0) : 0;
+  const totalExpenses = canSeeMoney ? expensesToday?.total ?? 0 : 0;
   const netCash = totalIncome - totalExpenses;
 
   const initialSummary = {

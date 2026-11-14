@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireUser } from "@/lib/auth";
+import { requireUser, hasPermission, NO_PERMISSION } from "@/lib/auth";
 import { dbx, tx } from "@/lib/db";
 import { nextNumber } from "@/lib/orders";
 import { moveStock } from "@/lib/inventory";
@@ -23,6 +23,21 @@ export type BuybackInput = {
 
 export async function createBuyback(input: BuybackInput): Promise<{ ok: true; id: number } | { ok: false; error: string }> {
   const user = await requireUser();
+  if (!hasPermission(user, "buybacks_view")) return { ok: false, error: NO_PERMISSION };
+  if (!input?.seller || !input.device || !input.checks) return { ok: false, error: "Datos de la retoma incompletos." };
+  const txt = (v: unknown, max = 200) => (typeof v === "string" ? v : v == null ? "" : String(v)).trim().slice(0, max);
+  const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v > 0 ? Math.round(v * 100) / 100 : 0);
+  input = {
+    ...input,
+    seller: { id: Number.isInteger(input.seller.id) ? input.seller.id : undefined, name: txt(input.seller.name), doc_id: txt(input.seller.doc_id, 40), phone: txt(input.seller.phone, 40) },
+    device: { device_type: txt(input.device.device_type, 40), brand: txt(input.device.brand, 80), model: txt(input.device.model, 120), color: txt(input.device.color, 60), capacity: txt(input.device.capacity, 40), imei: txt(input.device.imei, 40), serial: txt(input.device.serial, 60) },
+    grade: txt(input.grade, 20),
+    notes: txt(input.notes, 2000),
+    price: num(input.price),
+    salePrice: num(input.salePrice),
+    payout: txt(input.payout, 40),
+    signature: typeof input.signature === "string" ? input.signature : null,
+  };
   if (!input.seller.name.trim() || !input.seller.phone.trim() || !input.seller.doc_id.trim())
     return { ok: false, error: "Nombre, cédula y celular del vendedor son obligatorios." };
   if (!input.device.model.trim()) return { ok: false, error: "Falta el modelo." };
@@ -77,9 +92,10 @@ export async function voidBuyback(fd: FormData) {
   const user = await requireUser();
   if (user.role !== "admin") throw new Error("Solo el administrador puede anular retomas.");
   const id = parseInt(String(fd.get("id")), 10);
-  const b = (await dbx.get("SELECT * FROM buybacks WHERE id = ?", id)) as { id: number; number: string; status: string; product_id: number; payout: string; price: number; customer_id: number } | undefined;
-  if (!b || b.status === "anulada") return;
+  if (!id) return;
   await tx(async (t) => {
+    const b = (await t.get("SELECT * FROM buybacks WHERE id = ?", id)) as { id: number; number: string; status: string; product_id: number; payout: string; price: number; customer_id: number } | undefined;
+    if (!b || b.status === "anulada") return;
     await moveStock({ productId: b.product_id, qty: -1, reason: "ajuste", note: `Anulación ${b.number}`, userId: user.id }, t);
     (await t.run("UPDATE products SET active = 0 WHERE id = ?", b.product_id));
     if (b.payout === "Saldo a favor") (await t.run("UPDATE customers SET store_credit = MAX(store_credit - ?, 0) WHERE id = ?", b.price, b.customer_id));

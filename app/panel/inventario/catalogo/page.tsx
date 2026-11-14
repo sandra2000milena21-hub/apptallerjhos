@@ -1,4 +1,4 @@
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { listCatalog, searchProducts } from "@/lib/inventory";
 import { DEVICE_TYPES, deviceType } from "@/lib/constants";
 import { money } from "@/lib/format";
@@ -8,7 +8,7 @@ import { deleteCatalogItem, saveCatalogItem } from "../actions";
 export const metadata = { title: "Catálogo de reparaciones" };
 
 export default async function Catalogo() {
-  await requireUser();
+  await requirePermission("inventory_view");
   const items = await listCatalog();
   const parts = await searchProducts("", { kind: "repuesto", limit: 1000 });
 

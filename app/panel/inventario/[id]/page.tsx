@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { dbx } from "@/lib/db";
 import { getProduct } from "@/lib/inventory";
 import { code128Svg } from "@/lib/barcode";
@@ -21,7 +21,7 @@ const REASONS: Record<string, string> = {
 };
 
 export default async function ProductPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ ok?: string }> }) {
-  await requireUser();
+  await requirePermission("inventory_view");
   const p = await getProduct(parseInt((await params).id, 10));
   if (!p) notFound();
   const { ok } = await searchParams;
